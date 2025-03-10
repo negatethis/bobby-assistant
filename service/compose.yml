@@ -1,0 +1,29 @@
+services:
+  bobby-assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    environment:
+      - GEMINI_KEY=${GEMINI_KEY}
+      - MAPBOX_KEY=${MAPBOX_KEY}
+      - EXCHANGE_RATE_API_KEY=${EXCHANGE_RATE_API_KEY}
+      - USER_IDENTIFICATION_URL=http://faux-user-identifier:4090
+      - REDIS_URL=redis://redis-bobby:6379
+  redis-bobby:
+    image: redis:6.0.9
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+  faux-user-identifier:
+    image: ghcr.io/jplexer/faux-user-identifier:main
+    ports:
+      - "4090:4090"
+    restart: unless-stopped
+    environment:
+      USER_TOKENS: >-
+        {
+          "example-token": {"user_id": 1000, "has_subscription": true}
+        }
