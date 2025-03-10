@@ -379,6 +379,7 @@ func GetCurrentConditions(ctx context.Context, lat, lon float64, units string) (
     // Create current conditions object
     conditions := &CurrentConditions{
         Temperature:           int(openMeteoResp.CurrentWeather.Temperature),
+        TemperatureFeelsLike:  int(openMeteoResp.CurrentWeather.Temperature),
         WindSpeed:             int(openMeteoResp.CurrentWeather.Windspeed),
         WindDirectionCardinal: cardinalFromDegrees(int(openMeteoResp.CurrentWeather.WindDirection)),
         IconCode:              weatherCodeToIconCode(openMeteoResp.CurrentWeather.WeatherCode),
@@ -396,7 +397,6 @@ func GetCurrentConditions(ctx context.Context, lat, lon float64, units string) (
     // Add additional data if we found the current time in hourly data
     if currentTimeIndex >= 0 && openMeteoResp.Hourly != nil {
         conditions.RelativeHumidity = int(openMeteoResp.Hourly.RelativeHumidity[currentTimeIndex])
-        conditions.TemperatureFeelsLike = int(openMeteoResp.Hourly.ApparentTemperature[currentTimeIndex])
         conditions.Precip1Hour = float32(openMeteoResp.Hourly.Precipitation[currentTimeIndex])
         
         // Set visibility - scale to miles or km as needed
