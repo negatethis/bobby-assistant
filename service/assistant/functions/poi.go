@@ -21,6 +21,7 @@ import (
 	"github.com/pebble-dev/bobby-assistant/service/assistant/query"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/quota"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/util/mapbox"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/util/photon"
 	"google.golang.org/genai"
 	"log"
 	"net/url"
@@ -83,7 +84,7 @@ func searchPoi(ctx context.Context, quotaTracker *quota.Tracker, args interface{
 	qs := url.Values{}
 	location := query.LocationFromContext(ctx)
 	if poiQuery.Location != "" {
-		coords, err := mapbox.GeocodeWithContext(ctx, poiQuery.Location)
+		coords, err := photon.GeocodeWithContext(ctx, poiQuery.Location)
 		if err != nil {
 			span.AddField("error", err)
 			return Error{Error: "Error finding location: " + err.Error()}

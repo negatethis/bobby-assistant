@@ -17,7 +17,7 @@ package assistant
 import (
 	"context"
 	"github.com/honeycombio/beeline-go"
-	"github.com/pebble-dev/bobby-assistant/service/assistant/util/mapbox"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/util/photon"
 	"log"
 	"strconv"
 	"time"
@@ -59,11 +59,11 @@ func generateLanguageSentence(ctx context.Context) string {
 }
 
 func (ps *PromptSession) getPlaceFromLocation(ctx context.Context) (string, error) {
-	// Use the Mapbox API to turn the user's longitude and latitude into a place name.
-	// We don't want anything more specific than their town name, so we filter at that level ("place" in Mapbox terms).
+	// Use the Photon API to turn the user's longitude and latitude into a place name.
+	// We don't want anything more specific than their town name, so we filter at that level.
 	// We will return just a region or country if there isn't a nearby place.
 	location := query.LocationFromContext(ctx)
-	feature, err := mapbox.ReverseGeocode(ctx, location.Lon, location.Lat)
+	feature, err := photon.ReverseGeocode(ctx, location.Lon, location.Lat)
 	if err != nil {
 		return "", err
 	}

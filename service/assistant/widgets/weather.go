@@ -19,7 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/query"
-	"github.com/pebble-dev/bobby-assistant/service/assistant/util/mapbox"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/util/photon"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/util/weather"
 	"log"
 	"strings"
@@ -81,7 +81,7 @@ func resolveLocation(ctx context.Context, location string) (string, query.Locati
 		lon = location.Lon
 	} else {
 		// Look up the location
-		coords, err := mapbox.GeocodeWithContext(ctx, location)
+		coords, err := photon.GeocodeWithContext(ctx, location)
 		if err != nil {
 			return "", query.Location{}, fmt.Errorf("geocding location failed: %w", err)
 		}
@@ -90,11 +90,11 @@ func resolveLocation(ctx context.Context, location string) (string, query.Locati
 	}
 	locationDisplayName := location
 	// reverse geocode the location again so it's coherent
-	feature, err := mapbox.ReverseGeocode(ctx, lon, lat)
+	feature, err := photon.ReverseGeocode(ctx, lon, lat)
 	if err != nil {
 		return "", query.Location{}, fmt.Errorf("reverse geocoding location failed: %w", err)
 	}
-	locationDisplayName = feature.Text
+	locationDisplayName = feature.PlaceName
 	return locationDisplayName, query.Location{Lat: lat, Lon: lon}, nil
 }
 

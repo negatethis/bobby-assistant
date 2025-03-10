@@ -20,7 +20,7 @@ import (
 	"github.com/honeycombio/beeline-go"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/query"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/quota"
-	"github.com/pebble-dev/bobby-assistant/service/assistant/util/mapbox"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/util/photon"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/util/weather"
 	"google.golang.org/genai"
 )
@@ -84,7 +84,7 @@ func getWeather(ctx context.Context, quotaTracker *quota.Tracker, args interface
 		arg.Location = ""
 	}
 	if arg.Location != "" {
-		coords, err := mapbox.GeocodeWithContext(ctx, arg.Location)
+		coords, err := photon.GeocodeWithContext(ctx, arg.Location)
 		if err != nil {
 			span.AddField("error", err)
 			return Error{"Error finding location: " + err.Error()}
