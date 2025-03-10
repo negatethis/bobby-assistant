@@ -2,7 +2,7 @@ Gemini
 AI processing is provided by Google's Gemini under the terms at https://ai.google.dev/gemini-api/terms (Bobby is a 'paid service').
 
 Weather
-Weather data provided by The Weather Channel.
+Weather data provided by Open-Meteo.
 
 POIs
 © 2025 Mapbox and its suppliers. All rights reserved. Use of this data is subject to the Mapbox Terms of Service. (https://www.mapbox.com/about/maps/)
