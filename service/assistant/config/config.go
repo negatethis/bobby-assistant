@@ -25,6 +25,7 @@ type Config struct {
 	RedisURL              string
 	UserIdentificationURL string
 	HoneycombKey          string
+	GroqAPIKey 			  string
 }
 
 var c Config
@@ -41,5 +42,6 @@ func init() {
 		RedisURL:              os.Getenv("REDIS_URL"),
 		UserIdentificationURL: os.Getenv("USER_IDENTIFICATION_URL"),
 		HoneycombKey:          os.Getenv("HONEYCOMB_KEY"),
+		GroqAPIKey:            os.Getenv("GROQ_API_KEY"),
 	}
 }
