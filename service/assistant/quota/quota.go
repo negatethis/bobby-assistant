@@ -29,7 +29,6 @@ const InputTokenCredits = 4
 const OutputTokenCredits = 16
 const LiteInputTokenCredits = 3
 const LiteOutputTokenCredits = 12
-const WeatherQueryCredits = 21_000
 const PoiSearchCredits = 68_000
 const RouteCalculationCredits = 80_000
 const MonthlyQuotaCredits = 80_000_000
