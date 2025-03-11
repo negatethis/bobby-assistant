@@ -99,7 +99,6 @@ func getWeather(ctx context.Context, quotaTracker *quota.Tracker, args interface
 		lat, lon = location.Lat, location.Lon
 	}
 
-	_ = quotaTracker.ChargeCredits(ctx, quota.WeatherQueryCredits)
 	switch arg.Kind {
 	case "current":
 		return processCurrentWeather(ctx, lat, lon, arg.Unit)
