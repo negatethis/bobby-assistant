@@ -1,7 +1,7 @@
 {
   "name": "Bobby",
   "author": "Rebble",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "keywords": [
     "pebble-app"
   ],
@@ -95,11 +95,6 @@
         {
           "file": "images/root_screen/pony.pdc",
           "name": "ROOT_SCREEN_PONY",
-          "type": "raw"
-        },
-        {
-          "file": "images/root_screen/speech_bubble.pdc",
-          "name": "ROOT_SCREEN_SPEECH_BUBBLE",
           "type": "raw"
         },
         {
