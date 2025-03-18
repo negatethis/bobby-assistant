@@ -68,9 +68,21 @@ void conversation_destroy(Conversation* conversation) {
         free(entry->content.error);
         break;
       case EntryTypeAction:
-        // Only generic sentence actions need further cleanup.
-        if (entry->content.action->type == ConversationActionTypeGenericSentence) {
-          free(entry->content.action->action.generic_sentence.sentence);
+        // Only alarms and generic sentence actions need further cleanup.
+        switch (entry->content.action->type) {
+          case ConversationActionTypeSetAlarm:
+            if (entry->content.action->action.set_alarm.name) {
+              free(entry->content.action->action.set_alarm.name);
+            }
+            break;
+          case ConversationActionTypeGenericSentence:
+            free(entry->content.action->action.generic_sentence.sentence);
+            break;
+          case ConversationActionTypeSetReminder:
+          case ConversationActionTypeDeleteReminder:
+          case ConversationActionTypeUpdateChecklist:
+            // These have nothing to clean up.
+            break;
         }
         free(entry->content.action);
         break;
@@ -89,6 +101,17 @@ void conversation_destroy(Conversation* conversation) {
             break;
           case ConversationWidgetTypeWeatherMultiDay:
             free(entry->content.widget->widget.weather_multi_day.location);
+            break;
+          case ConversationWidgetTypeTimer:
+            if (entry->content.widget->widget.timer.name) {
+              free(entry->content.widget->widget.timer.name);
+            }
+            break;
+          case ConversationWidgetTypeNumber:
+            free(entry->content.widget->widget.number.number);
+            if (entry->content.widget->widget.number.unit) {
+              free(entry->content.widget->widget.number.unit);
+            }
             break;
         }
         free(entry->content.widget);
@@ -331,5 +354,38 @@ bool conversation_is_idle(Conversation* conversation) {
   if (entry->type == EntryTypeResponse) {
     return entry->content.response->complete;
   }
+  if (entry->type == EntryTypeWidget) {
+    return true;
+  }
   return false;
+}
+
+static bool prv_entry_type_is_assistant(ConversationEntry* entry) {
+  switch (entry->type) {
+    case EntryTypePrompt:
+    case EntryTypeError:
+    case EntryTypeThought:
+    case EntryTypeAction:
+      return false;
+    case EntryTypeResponse:
+      return true;
+    case EntryTypeWidget:
+      return !entry->content.widget->locally_created;
+  }
+  return false;
+}
+
+bool conversation_assistant_just_started(Conversation* conversation) {
+  ConversationEntry *entry = conversation_peek(conversation);
+  if (entry == NULL) {
+    return false;
+  }
+  if (!prv_entry_type_is_assistant(entry)) {
+    return false;
+  }
+  if (conversation->entry_count == 1) {
+    return true;
+  }
+  ConversationEntry *previous = &conversation->entries[conversation->entry_count - 2];
+  return !prv_entry_type_is_assistant(previous);
 }

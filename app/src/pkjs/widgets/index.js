@@ -15,7 +15,12 @@
  */
 
 var weather = require('./weather');
+var timer = require('./timer');
+var highlights = require('./highlights');
+
 var widgetMap = {
+    'timer': timer.timer,
+    'number': highlights.number,
     'weather-single-day': weather.singleDay,
     'weather-current': weather.current,
     'weather-multi-day': weather.multiDay

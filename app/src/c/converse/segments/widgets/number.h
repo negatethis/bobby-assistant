@@ -14,23 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef ALARMS_MANAGER_H
-#define ALARMS_MANAGER_H
+#pragma once
 
 #include <pebble.h>
+#include "../../conversation.h"
 
-typedef struct AlarmManager AlarmManager;
-typedef struct Alarm Alarm;
+typedef Layer NumberWidget;
 
-void alarm_manager_init();
-int alarm_manager_add_alarm(time_t when, bool is_timer, char* name, bool conversational);
-int alarm_manager_cancel_alarm(time_t when, bool is_timer);
-int alarm_manager_get_alarm_count();
-Alarm* alarm_manager_get_alarm(int index);
-bool alarm_manager_maybe_alarm();
-
-time_t alarm_get_time(Alarm* alarm);
-bool alarm_is_timer(Alarm* alarm);
-char* alarm_get_name(Alarm* alarm);
-
-#endif
+NumberWidget* number_widget_create(GRect rect, ConversationEntry* entry);
+ConversationEntry* number_widget_get_entry(NumberWidget* layer);
+void number_widget_destroy(NumberWidget* layer);
+void number_widget_update(NumberWidget* layer);

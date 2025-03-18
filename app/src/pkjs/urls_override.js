@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright 2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,13 +14,5 @@
  * limitations under the License.
  */
 
-#ifndef GIT_VERSION_AUTO_H
-#define GIT_VERSION_AUTO_H
-
-#define GIT_VERSION_TAG "@TAG@"
-#define GIT_VERSION_DESCRIPTION "@DESCRIPTION@"
-#define GIT_VERSION_COMMIT "@COMMIT@"
-#define GIT_VERSION_COMMIT_SHORT "@COMMIT_SHORT@"
-#define GIT_VERSION_TIMESTAMP @TIMESTAMP@
-
-#endif //GIT_VERSION_AUTO_H
+// You can set exports.QUERY_URL or exports.QUOTA_URL in this file to override them without
+// needing to edit the main urls.js.

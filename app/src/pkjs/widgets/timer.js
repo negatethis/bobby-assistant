@@ -14,4 +14,17 @@
  * limitations under the License.
  */
 
-exports.tag = "@TAG@";
+exports.timer = function(session, params) {
+    console.log(JSON.stringify(params));
+    var time = new Date(params['target_time'])
+    var name = params['name'] || null;
+    var message = {
+        TIMER_WIDGET: 1,
+        TIMER_WIDGET_TARGET_TIME: Math.round(time.getTime() / 1000),
+    };
+    if (name && name.length > 0) {
+        message['TIMER_WIDGET_NAME'] = name;
+    }
+    console.log(JSON.stringify(message));
+    session.enqueue(message);
+}

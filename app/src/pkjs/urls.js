@@ -17,3 +17,16 @@
 // put your server here.
 exports.QUERY_URL = 'wss://bobby.funnyna.me/query';
 exports.QUOTA_URL = 'https://bobby.funnyna.me/quota';
+exports.FEEDBACK_URL = 'https://bobby-api.rebble.io/feedback';
+
+var override = require('./urls_override');
+
+if (override.QUERY_URL) {
+    exports.QUERY_URL = override.QUERY_URL;
+}
+if (override.QUOTA_URL) {
+    exports.QUOTA_URL = override.QUOTA_URL;
+}
+if (override.FEEDBACK_URL) {
+    exports.FEEDBACK_URL = override.FEEDBACK_URL;
+}

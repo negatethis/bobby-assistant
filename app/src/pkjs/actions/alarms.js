@@ -18,6 +18,7 @@ var message_keys = require('message_keys');
 
 function setAlarm(session, message, callback) {
     var time = message['time'];
+    var name = message['name'] || null;
     var isTimer = !!message['isTimer'];
     var cancelling = !!message['cancel'];
     var date = new Date(time);
@@ -91,10 +92,14 @@ function setAlarm(session, message, callback) {
     };
     Pebble.addEventListener('appmessage', handleMessage);
     if (!cancelling) {
-        session.enqueue({
+        var request = {
             SET_ALARM_TIME: unixTime,
             SET_ALARM_IS_TIMER: isTimer,
-        });
+        };
+        if (name) {
+            request.SET_ALARM_NAME = name;
+        }
+        session.enqueue(request);
     } else {
         session.enqueue({
             CANCEL_ALARM_TIME: unixTime,
@@ -144,20 +149,20 @@ function getAlarm(session, message, callback) {
         var count = data[message_keys.GET_ALARM_RESULT];
         for (var i = 0; i < count; ++i) {
             var alarmTime = data[message_keys.GET_ALARM_RESULT + i + 1];
+            var alarmName = data[message_keys.GET_ALARM_NAME + i + 1] || null;
             if (isTimer) {
                 var secondsLeft = alarmTime - watchTime;
                 var formattedTimeLeft = "";
-                if (secondsLeft > 3600) {
-                    var hours = Math.floor(secondsLeft / 3600);
-                    var minutes = Math.floor((secondsLeft % 3600) / 60);
-                    var seconds = secondsLeft % 60;
-                    formattedTimeLeft = hours + ":" + leftPad2(minutes) + ":" + leftPad2(seconds);
-                } else {
-                    var minutes = Math.floor(secondsLeft / 60);
-                    var seconds = secondsLeft % 60;
-                    formattedTimeLeft = minutes + ":" + leftPad2(seconds);
+                var hours = Math.floor(secondsLeft / 3600);
+                var minutes = Math.floor((secondsLeft % 3600) / 60);
+                var seconds = secondsLeft % 60;
+                formattedTimeLeft = hours + ":" + leftPad2(minutes) + ":" + leftPad2(seconds);
+                var expirationDate = new Date(alarmTime * 1000);
+                var r = {"secondsLeft": secondsLeft, "formattedTimeLeft": formattedTimeLeft, "expirationTimeForDeletingAndWidgets": expirationDate.toISOString()};
+                if (alarmName) {
+                    r.name = alarmName;
                 }
-                resp.push({"secondsLeft": alarmTime - watchTime, "formattedTimeLeft": formattedTimeLeft});
+                resp.push(r);
             } else {
                 var date = new Date(alarmTime * 1000);
                 var formatted = (1900 + date.getYear()) + "-" + leftPad2(date.getMonth() + 1) + "-" + leftPad2(date.getDate()) + "T" + leftPad2(date.getHours()) + ":" + leftPad2(date.getMinutes()) + ":" + leftPad2(date.getSeconds());
@@ -167,7 +172,11 @@ function getAlarm(session, message, callback) {
                     tzOffset = -tzOffset;
                 }
                 formatted += leftPad2(Math.floor(tzOffset / 60)) + ":" + leftPad2(tzOffset % 60);
-                resp.push({"time": formatted});
+                var r = {"time": formatted};
+                if (alarmName) {
+                    r.name = alarmName;
+                }
+                resp.push(r);
             }
         }
         callback(obj);

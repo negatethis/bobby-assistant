@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright 2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,23 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef ALARMS_MANAGER_H
-#define ALARMS_MANAGER_H
-
-#include <pebble.h>
-
-typedef struct AlarmManager AlarmManager;
-typedef struct Alarm Alarm;
-
-void alarm_manager_init();
-int alarm_manager_add_alarm(time_t when, bool is_timer, char* name, bool conversational);
-int alarm_manager_cancel_alarm(time_t when, bool is_timer);
-int alarm_manager_get_alarm_count();
-Alarm* alarm_manager_get_alarm(int index);
-bool alarm_manager_maybe_alarm();
-
-time_t alarm_get_time(Alarm* alarm);
-bool alarm_is_timer(Alarm* alarm);
-char* alarm_get_name(Alarm* alarm);
-
-#endif
+exports.number = function(session, params) {
+    console.log(JSON.stringify(params));
+    var number = params['number'];
+    var message = {
+        HIGHLIGHT_WIDGET: 1,
+        HIGHLIGHT_WIDGET_PRIMARY: number,
+    };
+    var unit = params['unit'];
+    if (unit && unit.length > 0) {
+        message['HIGHLIGHT_WIDGET_SECONDARY'] = unit;
+    }
+    console.log(JSON.stringify(message));
+    session.enqueue(message);
+}

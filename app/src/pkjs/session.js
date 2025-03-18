@@ -21,7 +21,6 @@ var widgets = require('./widgets');
 
 var API_URL = require('./urls').QUERY_URL;
 var package_json = require('package.json');
-var git_version = require('git_version');
 
 function Session(prompt, threadId) {
     this.prompt = prompt;
@@ -51,12 +50,11 @@ Session.prototype.run = function() {
     // negate this because JavaScript does it backwards for some reason.
     url += '&tzOffset=' + (-(new Date()).getTimezoneOffset());
     url += '&actions=' + actions.getSupportedActions().join(',');
-    url += '&widgets=weather';
+    url += '&widgets=weather,timer,number';
     var settings = getSettings();
     url += '&units=' + settings['UNIT_PREFERENCE'] || '';
     url += '&lang=' + settings['LANGUAGE_CODE'] || '';
     url += '&version=' + package_json['version'];
-    url += '&git=' + git_version.tag;
 
     console.log(url);
     this.ws = new WebSocket(url);
@@ -68,14 +66,25 @@ Session.prototype.handleMessage = function(event) {
     var message = event.data;
     console.log(message);
     if (message[0] == 'c') {
-        var widgetRegex = /<<!!WIDGET:(.+?)!!>>/g;
+        var widgetRegex = /<<!!WIDGET:(.+?)!!>>/;
         var content = message.substring(1);
         var match;
-        while (match = widgetRegex.exec(content)) {
+        while (content.length > 0) {
+            match = widgetRegex.exec(content);
+            if (!match) {
+                break;
+            }
             var widget = match[1];
             console.log("Widget found: " + widget);
-            content = content.replace(match[0], '');
+            var start = match.index;
+            if (start != 0) {
+                this.enqueue({
+                    CHAT: content.substring(0, start)
+                });
+            }
             this.processWidget(widget);
+            this.hasOpenDialog = false;
+            content = content.substring(match.index + match[0].length);
         }
         if (content.length > 0) {
             this.hasOpenDialog = true;

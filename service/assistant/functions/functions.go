@@ -38,6 +38,8 @@ const MaxResponseSize = 20000
 type Registration struct {
 	// The function definition. The Parameters field will be filled out automatically and can be omitted.
 	Definition genai.FunctionDeclaration
+	// Aliases for the function, in case the model gets the name of the function wrong.
+	Aliases []string
 	// The function to call, for a simple function
 	Fn ToolFunction
 	// The callback to call, for an action that round trips back to the watch.
@@ -49,6 +51,8 @@ type Registration struct {
 	InputType interface{}
 	// A capability the device must report for this function to be provided.
 	Capability string
+	// A capability the device must *not* report for this function to be provided.
+	AntiCapability string
 }
 
 type Error struct {
@@ -56,6 +60,7 @@ type Error struct {
 }
 
 var functionMap = make(map[string]Registration)
+var functionAliases = make(map[string]string)
 
 // registerFunction registers a function for later use by GetFunctionDefinitions and CallFunction.
 // Functions implementations are generally expected to call registerFunction during init to register
@@ -65,9 +70,15 @@ func registerFunction(reg Registration) {
 		panic(fmt.Sprintf("input type %T must be exported.", reg.InputType))
 	}
 	functionMap[reg.Definition.Name] = reg
+	for _, alias := range reg.Aliases {
+		functionAliases[alias] = reg.Definition.Name
+	}
 }
 
 func IsAction(fn string) bool {
+	if realFunction, ok := functionAliases[fn]; ok {
+		fn = realFunction
+	}
 	if _, ok := functionMap[fn]; !ok {
 		return false
 	}
@@ -77,6 +88,10 @@ func IsAction(fn string) bool {
 // CallFunction calls a function by name with the given arguments. The arguments are expected to be
 // a string containing a JSON object (presumably from GPT). The result is returned as a JSON string.
 func CallFunction(ctx context.Context, qt *quota.Tracker, fn, args string) (string, error) {
+	if realFunction, ok := functionAliases[fn]; ok {
+		log.Printf("Model asked for function %q, which is an alias for %q.\n", fn, realFunction)
+		fn = realFunction
+	}
 	if _, ok := functionMap[fn]; !ok || functionMap[fn].Fn == nil {
 		return "", fmt.Errorf("function %q not found", fn)
 	}
@@ -98,6 +113,10 @@ func CallFunction(ctx context.Context, qt *quota.Tracker, fn, args string) (stri
 }
 
 func CallAction(ctx context.Context, qt *quota.Tracker, fn, args string, ws *websocket.Conn) (string, error) {
+	if realFunction, ok := functionAliases[fn]; ok {
+		log.Printf("Model asked for action %q, which is an alias for %q.\n", fn, realFunction)
+		fn = realFunction
+	}
 	if _, ok := functionMap[fn]; !ok || functionMap[fn].Cb == nil {
 		return "", fmt.Errorf("function %q not found", fn)
 	}
@@ -176,6 +195,9 @@ func CallAction(ctx context.Context, qt *quota.Tracker, fn, args string, ws *web
 }
 
 func SummariseFunction(fn, args string) string {
+	if realFunction, ok := functionAliases[fn]; ok {
+		fn = realFunction
+	}
 	if _, ok := functionMap[fn]; !ok {
 		return "Bobby is slightly lost"
 	}
@@ -201,7 +223,8 @@ func GetFunctionDefinitionsByCapability() map[string][]genai.FunctionDeclaration
 func GetFunctionDefinitionsForCapabilities(capabilities []string) []*genai.FunctionDeclaration {
 	var definitions []*genai.FunctionDeclaration
 	for _, reg := range functionMap {
-		if reg.Capability == "" || slices.Contains(capabilities, reg.Capability) {
+		if (reg.Capability == "" || slices.Contains(capabilities, reg.Capability)) &&
+			(reg.AntiCapability == "" || !slices.Contains(capabilities, reg.AntiCapability)) {
 			d := reg.Definition
 			definitions = append(definitions, &d)
 		}

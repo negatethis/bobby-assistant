@@ -21,15 +21,28 @@ var Clay = require('pebble-clay');
 var clayConfig = require('./config.json');
 var customConfigFunction = require('./custom_config');
 var config = require('./config');
-var git_version = require('git_version');
 var reminders = require('./reminders');
+var feedback = require('./feedback');
+var package_json = require('package.json');
 
 
 var clay = new Clay(clayConfig, customConfigFunction);
 
 function main() {
+    doQuotaWarning();
     location.update();
     Pebble.addEventListener('appmessage', handleAppMessage);
+}
+
+function doQuotaWarning() {
+    quota.fetchQuota(function(response) {
+        if (!response.hasSubscription) {
+            Pebble.showSimpleNotificationOnPebble(
+                "Subscription Needed",
+                "In order to use Bobby, you need a Rebble subscription. You can sign up for a subscription at auth.rebble.io."
+            );
+        }
+    });
 }
 
 function handleAppMessage(e) {
@@ -49,7 +62,7 @@ function handleAppMessage(e) {
 
     if (data.QUOTA_REQUEST) {
         console.log("Requesting quota...");
-        quota.fetchQuota();
+        quota.handleQuotaRequest();
     }
     if ('LOCATION_ENABLED' in data) {
         config.setSetting("LOCATION_ENABLED", !!data.LOCATION_ENABLED);
@@ -59,11 +72,15 @@ function handleAppMessage(e) {
             LOCATION_ENABLED: data.LOCATION_ENABLED,
         });
     }
+    if ('FEEDBACK_TEXT' in data) {
+        console.log("Handling feedback...");
+        feedback.handleFeedbackRequest(data);
+    }
 }
 
 Pebble.addEventListener("ready",
     function(e) {
-        console.log("Bobby " + git_version.tag);
+        console.log("Bobby " + package_json['version']);
         Pebble.getTimelineToken(function(token) {
             session.userToken = token;
             main();

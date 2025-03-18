@@ -34,12 +34,15 @@ typedef enum {
   ConversationWidgetTypeWeatherSingleDay,
   ConversationWidgetTypeWeatherCurrent,
   ConversationWidgetTypeWeatherMultiDay,
+  ConversationWidgetTypeTimer,
+  ConversationWidgetTypeNumber,
 } ConversationWidgetType;
 
 typedef struct {
   time_t time;
   bool is_timer;
   bool deleted;
+  char* name;
 } ConversationActionSetAlarm;
 
 typedef struct {
@@ -118,11 +121,24 @@ typedef struct {
 } ConversationWidgetWeatherMultiDay;
 
 typedef struct {
+  time_t target_time;
+  char *name;
+} ConversationWidgetTimer;
+
+typedef struct {
+  char *number;
+  char *unit;
+} ConversationWidgetNumber;
+
+typedef struct {
   ConversationWidgetType type;
+  bool locally_created;
   union {
     ConversationWidgetWeatherSingleDay weather_single_day;
     ConversationWidgetWeatherCurrent weather_current;
     ConversationWidgetWeatherMultiDay weather_multi_day;
+    ConversationWidgetTimer timer;
+    ConversationWidgetNumber number;
   } widget;
 } ConversationWidget;
 
@@ -150,6 +166,7 @@ void conversation_set_thread_id(Conversation* conversation, const char* thread_i
 const char* conversation_get_thread_id(Conversation* conversation);
 int conversation_length(Conversation* conversation);
 bool conversation_is_idle(Conversation* conversation);
+bool conversation_assistant_just_started(Conversation* conversation);
 ConversationEntry* conversation_entry_at_index(Conversation* conversation, int index);
 ConversationEntry* conversation_peek(Conversation* conversation);
 EntryType conversation_entry_get_type(ConversationEntry* entry);

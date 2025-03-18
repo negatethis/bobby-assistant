@@ -1,7 +1,7 @@
 {
   "name": "Bobby",
   "author": "Rebble",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "keywords": [
     "pebble-app"
   ],
@@ -74,7 +74,21 @@
       "REMINDER_ID",
       "REMINDER_TIME",
       "REMINDER_DELETE",
-      "ACTION_REMINDER_DELETED"
+      "ACTION_REMINDER_DELETED",
+      "SET_ALARM_NAME",
+      "GET_ALARM_NAME[9]",
+      "TIMER_WIDGET",
+      "TIMER_WIDGET_TARGET_TIME",
+      "TIMER_WIDGET_NAME",
+      "HIGHLIGHT_WIDGET",
+      "HIGHLIGHT_WIDGET_PRIMARY",
+      "HIGHLIGHT_WIDGET_SECONDARY",
+      "QUOTA_HAS_SUBSCRIPTION",
+      "FEEDBACK_TEXT",
+      "FEEDBACK_APP_MAJOR",
+      "FEEDBACK_APP_MINOR",
+      "FEEDBACK_ALARM_COUNT",
+      "FEEDBACK_SEND_RESULT"
     ],
     "resources": {
       "media": [
@@ -185,6 +199,11 @@
           "type": "raw"
         },
         {
+          "file": "text/feedback_blurb.txt",
+          "name": "FEEDBACK_BLURB",
+          "type": "raw"
+        },
+        {
           "file": "weather/medium/generic.pdc",
           "name": "WEATHER_MEDIUM_GENERIC",
           "type": "raw"
@@ -262,6 +281,11 @@
         {
           "file": "weather/small/sunny.pdc",
           "name": "WEATHER_SMALL_SUNNY",
+          "type": "raw"
+        },
+        {
+          "file": "images/sent.pdc",
+          "name": "SENT_IMAGE",
           "type": "raw"
         }
       ]

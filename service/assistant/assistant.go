@@ -17,6 +17,7 @@ package assistant
 import (
 	"encoding/json"
 	"github.com/honeycombio/beeline-go/wrappers/hnynethttp"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/feedback"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/quota"
 	"log"
 	"net/http"
@@ -37,6 +38,7 @@ func NewService(r *redis.Client) *Service {
 	s.mux.HandleFunc("/query", s.handleQuery)
 	s.mux.HandleFunc("/quota", s.handleQuota)
 	s.mux.HandleFunc("/heartbeat", s.handleHeartbeat)
+	s.mux.HandleFunc("/feedback", feedback.HandleFeedback)
 	return s
 }
 
@@ -60,9 +62,9 @@ func (s *Service) handleQuota(rw http.ResponseWriter, r *http.Request) {
 	}
 	if !userInfo.HasSubscription {
 		response, err := json.Marshal(map[string]interface{}{
-			"user":           0,
-			"remaining":      0,
-			"hasSubcription": false,
+			"used":            0,
+			"remaining":       0,
+			"hasSubscription": false,
 		})
 		if err != nil {
 			log.Printf("Error marshalling quota response: %v", err)
@@ -79,9 +81,10 @@ func (s *Service) handleQuota(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	response, err := json.Marshal(map[string]int{
-		"used":      used,
-		"remaining": remaining,
+	response, err := json.Marshal(map[string]any{
+		"used":            used,
+		"remaining":       remaining,
+		"hasSubscription": true,
 	})
 	if err != nil {
 		log.Printf("Error marshalling quota response: %v", err)
