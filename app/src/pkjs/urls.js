@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-// put your server here.
-exports.QUERY_URL = 'wss://bobby.funnyna.me/query';
-exports.QUOTA_URL = 'https://bobby.funnyna.me/quota';
+
+exports.QUERY_URL = 'wss://bobby-api.rebble.io/query';
+exports.QUOTA_URL = 'https://bobby-api.rebble.io/quota';
 exports.FEEDBACK_URL = 'https://bobby-api.rebble.io/feedback';
 
 var override = require('./urls_override');
