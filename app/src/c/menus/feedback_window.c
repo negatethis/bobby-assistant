@@ -16,6 +16,7 @@
 
 #include "feedback_window.h"
 #include "../util/vector_sequence_layer.h"
+#include "../util/formatted_text_layer.h"
 #include "../util/result_window.h"
 #include "../util/style.h"
 #include "../alarms/manager.h"
@@ -26,7 +27,7 @@
 typedef struct {
   DictationSession *dict_session;
   ScrollLayer *scroll_layer;
-  TextLayer *text_layer;
+  FormattedTextLayer *text_layer;
   GBitmap *select_indicator;
   BitmapLayer *select_indicator_layer;
   char *blurb;
@@ -35,6 +36,7 @@ typedef struct {
   VectorSequenceLayer *loading_layer;
   Layer *scroll_indicator_down;
   StatusBarLayer *status_bar_layer;
+  bool busy;
 } FeedbackWindowData;
 
 static void prv_window_load(Window *window);
@@ -102,13 +104,11 @@ static void prv_window_load(Window *window) {
   resource_load(blurb_handle, (uint8_t *)data->blurb, blurb_length);
   data->blurb[blurb_length] = '\0';
 
-  data->text_layer = text_layer_create(GRect(5, 5, bounds.size.w - 10, 2000));
-  text_layer_set_text(data->text_layer, data->blurb);
-  text_layer_set_font(data->text_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
-  text_layer_set_overflow_mode(data->text_layer, GTextOverflowModeWordWrap);
-  GSize text_size = text_layer_get_content_size(data->text_layer);
-  layer_set_frame(text_layer_get_layer(data->text_layer), GRect(5, 5, bounds.size.w - 10, text_size.h));
-  scroll_layer_add_child(data->scroll_layer, text_layer_get_layer(data->text_layer));
+  data->text_layer = formatted_text_layer_create(GRect(5, 5, bounds.size.w - 10, 2000));
+  formatted_text_layer_set_text(data->text_layer, data->blurb);
+  GSize text_size = formatted_text_layer_get_content_size(data->text_layer);
+  layer_set_frame(formatted_text_layer_get_layer(data->text_layer), GRect(5, 5, bounds.size.w - 10, text_size.h));
+  scroll_layer_add_child(data->scroll_layer, formatted_text_layer_get_layer(data->text_layer));
   scroll_layer_set_content_size(data->scroll_layer, GSize(bounds.size.w, text_size.h + 10));
 
   data->select_indicator = gbitmap_create_with_resource(RESOURCE_ID_BUTTON_INDICATOR);
@@ -127,13 +127,14 @@ static void prv_window_load(Window *window) {
   dictation_session_enable_confirmation(data->dict_session, true);
 
   data->event_handle = events_app_message_register_inbox_received(prv_app_message_received, window);
+
+  data->busy = false;
 }
 
 static void prv_window_unload(Window *window) {
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Window unloading");
   FeedbackWindowData *data = window_get_user_data(window);
   dictation_session_destroy(data->dict_session);
-  text_layer_destroy(data->text_layer);
+  formatted_text_layer_destroy(data->text_layer);
   scroll_layer_destroy(data->scroll_layer);
   gbitmap_destroy(data->select_indicator);
   bitmap_layer_destroy(data->select_indicator_layer);
@@ -145,18 +146,18 @@ static void prv_window_unload(Window *window) {
   free(data->blurb);
   free(data);
   window_destroy(window);
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Window unloaded");
 }
 
 static void prv_click_config_provider() {
-  APP_LOG(APP_LOG_LEVEL_INFO, "Click menu configuration");
   window_single_click_subscribe(BUTTON_ID_SELECT, prv_select_clicked);
 }
 
 static void prv_select_clicked(ClickRecognizerRef recognizer, void *context) {
-  APP_LOG(APP_LOG_LEVEL_INFO, "Click menu selection");
   Window *window = context;
   FeedbackWindowData *data = window_get_user_data(window);
+  if (data->busy) {
+    return;
+  }
   dictation_session_start(data->dict_session);
 }
 
@@ -166,7 +167,9 @@ static void prv_dictation_status_callback(DictationSession *session, DictationSe
   if (status != DictationSessionStatusSuccess) {
     return;
   }
+  data->busy = true;
   layer_remove_from_parent(scroll_layer_get_layer(data->scroll_layer));
+  layer_remove_from_parent(bitmap_layer_get_layer(data->select_indicator_layer));
   layer_add_child(window_get_root_layer(window), vector_sequence_layer_get_layer(data->loading_layer));
   vector_sequence_layer_play(data->loading_layer);
   DictionaryIterator *iter;

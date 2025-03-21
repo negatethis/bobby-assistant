@@ -21,7 +21,7 @@
 
 typedef struct SessionWindow SessionWindow;
 
-void session_window_push();
+void session_window_push(int timeout);
 void session_window_destroy(SessionWindow* window);
 
 #endif

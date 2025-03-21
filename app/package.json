@@ -1,7 +1,7 @@
 {
   "name": "Bobby",
   "author": "Rebble",
-  "version": "0.21.0",
+  "version": "0.23.0",
   "keywords": [
     "pebble-app"
   ],
@@ -88,12 +88,17 @@
       "FEEDBACK_APP_MAJOR",
       "FEEDBACK_APP_MINOR",
       "FEEDBACK_ALARM_COUNT",
-      "FEEDBACK_SEND_RESULT"
+      "FEEDBACK_SEND_RESULT",
+      "QUICK_LAUNCH_BEHAVIOUR",
+      "TIMER_VIBE_PATTERN",
+      "ALARM_VIBE_PATTERN",
+      "REPORT_THREAD_UUID",
+      "REPORT_SEND_RESULT"
     ],
     "resources": {
       "media": [
         {
-          "file": "icons/menu_icon.png",
+          "file": "icons/menu_icon_default.png",
           "menuIcon": true,
           "name": "IMAGE_MENU_ICON",
           "type": "bitmap"
@@ -184,6 +189,11 @@
           "type": "raw"
         },
         {
+          "file": "text/about.txt",
+          "name": "ABOUT_TEXT",
+          "type": "raw"
+        },
+        {
           "file": "text/gemini_consent.txt",
           "name": "GEMINI_CONSENT_TEXT",
           "type": "raw"
@@ -201,6 +211,11 @@
         {
           "file": "text/feedback_blurb.txt",
           "name": "FEEDBACK_BLURB",
+          "type": "raw"
+        },
+        {
+          "file": "text/report_blurb.txt",
+          "name": "REPORT_BLURB",
           "type": "raw"
         },
         {
@@ -286,6 +301,160 @@
         {
           "file": "images/sent.pdc",
           "name": "SENT_IMAGE",
+          "type": "raw"
+        },
+        {
+          "file": "icons/menu_about.png",
+          "name": "MENU_ICON_ABOUT",
+          "type": "bitmap",
+          "targetPlatforms": [
+            "basalt"
+          ]
+        },
+        {
+          "file": "icons/menu_about_bw.png",
+          "name": "MENU_ICON_ABOUT",
+          "type": "bitmap",
+          "memoryFormat": "1Bit",
+          "targetPlatforms": [
+            "diorite"
+          ]
+        },
+        {
+          "file": "icons/menu_alarms.png",
+          "name": "MENU_ICON_ALARMS",
+          "type": "bitmap",
+          "targetPlatforms": [
+            "basalt"
+          ]
+        },
+        {
+          "file": "icons/menu_alarms_bw.png",
+          "name": "MENU_ICON_ALARMS",
+          "type": "bitmap",
+          "memoryFormat": "1Bit",
+          "targetPlatforms": [
+            "diorite"
+          ]
+        },
+        {
+          "file": "icons/menu_feedback.png",
+          "name": "MENU_ICON_FEEDBACK",
+          "type": "bitmap",
+          "targetPlatforms": [
+            "basalt"
+          ]
+        },
+        {
+          "file": "icons/menu_feedback_bw.png",
+          "name": "MENU_ICON_FEEDBACK",
+          "type": "bitmap",
+          "memoryFormat": "1Bit",
+          "targetPlatforms": [
+            "diorite"
+          ]
+        },
+        {
+          "file": "icons/menu_legal.png",
+          "name": "MENU_ICON_LEGAL",
+          "type": "bitmap",
+          "targetPlatforms": [
+            "basalt"
+          ]
+        },
+        {
+          "file": "icons/menu_legal_bw.png",
+          "name": "MENU_ICON_LEGAL",
+          "type": "bitmap",
+          "memoryFormat": "1Bit",
+          "targetPlatforms": [
+            "diorite"
+          ]
+        },
+        {
+          "file": "icons/menu_quota.png",
+          "name": "MENU_ICON_QUOTA",
+          "type": "bitmap",
+          "targetPlatforms": [
+            "basalt"
+          ]
+        },
+        {
+          "file": "icons/menu_quota_bw.png",
+          "name": "MENU_ICON_QUOTA",
+          "type": "bitmap",
+          "memoryFormat": "1Bit",
+          "targetPlatforms": [
+            "diorite"
+          ]
+        },
+        {
+          "file": "icons/menu_reminders.png",
+          "name": "MENU_ICON_REMINDERS",
+          "type": "bitmap",
+          "targetPlatforms": [
+            "basalt"
+          ]
+        },
+        {
+          "file": "icons/menu_reminders_bw.png",
+          "name": "MENU_ICON_REMINDERS",
+          "type": "bitmap",
+          "memoryFormat": "1Bit",
+          "targetPlatforms": [
+            "diorite"
+          ]
+        },
+        {
+          "file": "icons/menu_timers.png",
+          "name": "MENU_ICON_TIMERS",
+          "type": "bitmap",
+          "targetPlatforms": [
+            "basalt"
+          ]
+        },
+        {
+          "file": "icons/menu_timers_bw.png",
+          "name": "MENU_ICON_TIMERS",
+          "type": "bitmap",
+          "memoryFormat": "1Bit",
+          "targetPlatforms": [
+            "diorite"
+          ]
+        },
+        {
+          "file": "vibes/haptic_feedback.vibe",
+          "name": "VIBE_HAPTIC_FEEDBACK",
+          "type": "raw"
+        },
+        {
+          "file": "vibes/jackhammer.vibe",
+          "name": "VIBE_JACKHAMMER",
+          "type": "raw"
+        },
+        {
+          "file": "vibes/mario.vibe",
+          "name": "VIBE_MARIO",
+          "type": "raw"
+        },
+        {
+          "file": "vibes/nudge_nudge.vibe",
+          "name": "VIBE_NUDGE_NUDGE",
+          "type": "raw"
+        },
+        {
+          "file": "vibes/reveille.vibe",
+          "name": "VIBE_REVEILLE",
+          "type": "raw"
+        },
+        {
+          "file": "vibes/standard_long_high.vibe",
+          "name": "VIBE_STANDARD",
+          "type": "raw"
+        },
+        {
+          "file": "images/fence_pony.pdc",
+          "name": "FENCE_PONY",
           "type": "raw"
         }
       ]

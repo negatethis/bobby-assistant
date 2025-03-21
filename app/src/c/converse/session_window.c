@@ -20,9 +20,12 @@
 #include "conversation_manager.h"
 #include "segments/segment_layer.h"
 #include "../util/thinking_layer.h"
+#include "../util/style.h"
+#include "../vibes/haptic_feedback.h"
 
 #include <pebble.h>
-#include "../util/style.h"
+
+#include "report_window.h"
 
 #define PADDING 5
 
@@ -42,32 +45,50 @@ struct SessionWindow {
   bool dictation_pending;
   int content_height;
   int last_prompt_end_offset;
+  time_t query_time;
+  AppTimer *timeout_handle;
+  ActionMenuLevel *action_menu;
 };
+
+// this is a stupid hack because the way the session window is pushed is also stupid for some reason
+// since we only ever have one session window, we get away with it. but ew.
+static int s_timeout = 0;
 
 static void prv_window_load(Window *window);
 static void prv_window_appear(Window *window);
+static void prv_window_disappear(Window *window);
 static void prv_window_unload(Window *window);
 static void prv_destroy(SessionWindow *sw);
 static void prv_dictation_status_callback(DictationSession *session, DictationSessionStatus status, char *transcription, void *context);
 static void prv_conversation_manager_handler(bool entry_added, void* context);
 static void prv_click_config_provider(void *context);
 static void prv_select_clicked(ClickRecognizerRef recognizer, void *context);
+static void prv_select_long_pressed(ClickRecognizerRef recognizer, void *context);
 static void prv_update_thinking_layer(SessionWindow* sw);
 static int16_t prv_content_height(const SessionWindow* sw);
+static void prv_scrolled_handler(ScrollLayer* scroll_layer, void* context);
+static void prv_refresh_timeout(SessionWindow* sw);
+static void prv_timed_out(void *ctx);
+static void prv_cancel_timeout(SessionWindow* sw);
+static void prv_action_menu_query(ActionMenu *action_menu, const ActionMenuItem *action, void *context);
+static void prv_action_menu_report_thread(ActionMenu *action_menu, const ActionMenuItem *action, void *context);
 
-void session_window_push() {
+void session_window_push(int timeout) {
   Window *window = window_create();
   window_set_user_data(window, (void *)1);
+  s_timeout = timeout;
   window_set_window_handlers(window, (WindowHandlers) {
       .load = prv_window_load,
       .unload = prv_window_unload,
       .appear = prv_window_appear,
+      .disappear = prv_window_disappear,
   });
   window_stack_push(window, true);
 }
 
 static void prv_destroy(SessionWindow *sw) {
   APP_LOG(APP_LOG_LEVEL_INFO, "destroying SessionWindow %p.", sw);
+  prv_cancel_timeout(sw);
   dictation_session_destroy(sw->dictation);
   conversation_manager_destroy(sw->manager);
   status_bar_layer_destroy(sw->status_layer);
@@ -139,6 +160,7 @@ static void prv_window_load(Window *window) {
   scroll_layer_set_context(sw->scroll_layer, sw);
   scroll_layer_set_callbacks(sw->scroll_layer, (ScrollLayerCallbacks) {
     .click_config_provider = prv_click_config_provider,
+    .content_offset_changed_handler = prv_scrolled_handler,
   });
   scroll_layer_set_click_config_onto_window(sw->scroll_layer, window);
 
@@ -162,6 +184,11 @@ static void prv_window_appear(Window *window) {
   }
 }
 
+static void prv_window_disappear(Window *window) {
+  SessionWindow *sw = (SessionWindow *)window_get_user_data(window);
+  prv_cancel_timeout(sw);
+}
+
 static void prv_window_unload(Window *window) {
   SessionWindow *sw = (SessionWindow *)window_get_user_data(window);
   window_set_user_data(window, (void*)0);
@@ -173,6 +200,7 @@ static void prv_dictation_status_callback(DictationSession *session, DictationSe
   switch (status) {
   case DictationSessionStatusSuccess:
     conversation_manager_add_input(sw->manager, transcript);
+    sw->query_time = time(NULL);
     break;
   default:
     if (conversation_peek(conversation_manager_get_conversation(sw->manager)) == NULL) {
@@ -295,12 +323,35 @@ static void prv_conversation_manager_handler(bool entry_added, void* context) {
   prv_update_thinking_layer(sw);
   prv_set_scroll_height(sw);
   light_enable_interaction();
+  prv_refresh_timeout(sw);
+  // For responses that took longer than five seconds, pulse the vibe when we get useful data.
+  switch (entry_type) {
+    case EntryTypeResponse:
+    case EntryTypeWidget:
+    case EntryTypeAction:
+    case EntryTypeError:
+      if (sw->query_time > 0) {
+        if (time(NULL) >= sw->query_time + 5) {
+          vibe_haptic_feedback();
+        }
+        sw->query_time = 0;
+      }
+      break;
+    case EntryTypePrompt:
+    case EntryTypeThought:
+      // nothing to do here.
+      break;
+  }
+  if (entry_type == EntryTypeResponse || entry_type == EntryTypeWidget || entry_type == EntryTypeAction) {
+
+  }
   // For now, whenever we add a new entry, we want to scroll to the top of it.
 //  scroll_layer_set_content_offset(sw->scroll_layer, GPoint(0, layer_get_frame(layer).origin.y), true);
 }
 
 static void prv_click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_SELECT, prv_select_clicked);
+  window_long_click_subscribe(BUTTON_ID_SELECT, 0, prv_select_long_pressed, NULL);
 }
 
 static void prv_select_clicked(ClickRecognizerRef recognizer, void *context) {
@@ -308,4 +359,68 @@ static void prv_select_clicked(ClickRecognizerRef recognizer, void *context) {
   if (conversation_is_idle(conversation_manager_get_conversation(sw->manager))) {
     dictation_session_start(sw->dictation);
   }
+}
+
+static void prv_select_long_pressed(ClickRecognizerRef recognizer, void *context) {
+  SessionWindow* sw = context;
+  if (!conversation_is_idle(conversation_manager_get_conversation(sw->manager))) {
+    return;
+  }
+  ActionMenuLevel *action_menu = action_menu_level_create(2);
+  action_menu_level_add_action(action_menu, "Prompt", prv_action_menu_query, sw);
+  action_menu_level_add_action(action_menu, "Report conversation", prv_action_menu_report_thread, sw);
+  ActionMenuConfig config = (ActionMenuConfig) {
+    .root_level = action_menu,
+    .colors = {
+      .background = BRANDED_BACKGROUND_COLOUR,
+      .foreground = gcolor_legible_over(BRANDED_BACKGROUND_COLOUR),
+    },
+    .align = ActionMenuAlignCenter,
+    .context = sw
+  };
+  vibe_haptic_feedback();
+  action_menu_open(&config);
+}
+
+static void prv_action_menu_query(ActionMenu *action_menu, const ActionMenuItem *action, void *context) {
+  SessionWindow* sw = context;
+  dictation_session_start(sw->dictation);
+  action_menu_hierarchy_destroy(sw->action_menu, NULL, NULL);
+  sw->action_menu = NULL;
+}
+
+static void prv_action_menu_report_thread(ActionMenu *action_menu, const ActionMenuItem *action, void *context) {
+  SessionWindow* sw = context;
+  action_menu_hierarchy_destroy(sw->action_menu, NULL, NULL);
+  sw->action_menu = NULL;
+  report_window_push(conversation_get_thread_id(conversation_manager_get_conversation(sw->manager)));
+}
+
+static void prv_scrolled_handler(ScrollLayer* scroll_layer, void* context) {
+  SessionWindow* sw = context;
+  prv_refresh_timeout(sw);
+}
+
+static void prv_refresh_timeout(SessionWindow* sw) {
+  if (s_timeout == 0) {
+    return;
+  }
+  if (sw->timeout_handle) {
+    app_timer_cancel(sw->timeout_handle);
+  }
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Refreshed timeout");
+  sw->timeout_handle = app_timer_register(s_timeout, prv_timed_out, sw);
+}
+
+static void prv_cancel_timeout(SessionWindow* sw) {
+  if (sw->timeout_handle) {
+    app_timer_cancel(sw->timeout_handle);
+    sw->timeout_handle = NULL;
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Canceled timeout");
+  }
+}
+
+static void prv_timed_out(void *ctx) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Timed out");
+  window_stack_pop(true);
 }

@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/honeycombio/beeline-go"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/persistence"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/quota"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/verifier"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/widgets"
@@ -379,21 +380,32 @@ func (ps *PromptSession) Run(ctx context.Context) {
 	_ = ps.conn.Close(websocket.StatusNormalClosure, "")
 }
 
-type SerializedMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
 func (ps *PromptSession) storeThread(ctx context.Context, messages []*genai.Content) error {
 	ctx, span := beeline.StartSpan(ctx, "store_thread")
 	defer span.Send()
-	var toStore []SerializedMessage
+	var toStore []persistence.SerializedMessage
 	for _, m := range messages {
-		if len(m.Parts) != 0 && (m.Role == "user" || m.Role == "model") && len(strings.TrimSpace(m.Parts[0].Text)) > 0 {
-			toStore = append(toStore, SerializedMessage{
-				Content: m.Parts[0].Text,
-				Role:    m.Role,
-			})
+		if len(m.Parts) != 0 {
+			if m.Role == "user" || m.Role == "model" {
+				sm := persistence.SerializedMessage{
+					Role:         m.Role,
+					Content:      m.Parts[0].Text,
+					FunctionCall: m.Parts[0].FunctionCall,
+				}
+				if sm.FunctionCall != nil || len(strings.TrimSpace(m.Parts[0].Text)) > 0 {
+					toStore = append(toStore, sm)
+				}
+			} else if m.Role == "function" && m.Parts[0].FunctionResponse != nil {
+				fr := *m.Parts[0].FunctionResponse
+				fnInfo := functions.GetFunctionRegistration(fr.Name)
+				if fnInfo != nil && fnInfo.RedactOutputInChatHistory {
+					fr.Response = map[string]any{"redacted": "redacted to reduce context size, call again if necessary"}
+				}
+				toStore = append(toStore, persistence.SerializedMessage{
+					Role:             m.Role,
+					FunctionResponse: &fr,
+				})
+			}
 		}
 	}
 	j, err := json.Marshal(toStore)
@@ -408,20 +420,15 @@ func (ps *PromptSession) storeThread(ctx context.Context, messages []*genai.Cont
 func (ps *PromptSession) restoreThread(ctx context.Context, oldThreadId string) ([]*genai.Content, error) {
 	ctx, span := beeline.StartSpan(ctx, "restore_thread")
 	defer span.Send()
-	j, err := ps.redis.Get(ctx, "thread:"+oldThreadId).Result()
+	messages, err := persistence.LoadThread(ctx, ps.redis, oldThreadId)
 	if err != nil {
-		span.AddField("error", err)
-		return nil, err
-	}
-	var messages []SerializedMessage
-	if err := json.Unmarshal([]byte(j), &messages); err != nil {
 		span.AddField("error", err)
 		return nil, err
 	}
 	var result []*genai.Content
 	for _, m := range messages {
 		result = append(result, &genai.Content{
-			Parts: []*genai.Part{{Text: m.Content}},
+			Parts: []*genai.Part{{Text: m.Content, FunctionCall: m.FunctionCall, FunctionResponse: m.FunctionResponse}},
 			Role:  m.Role,
 		})
 	}
