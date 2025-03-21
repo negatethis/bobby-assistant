@@ -24,7 +24,7 @@
 static void prv_app_glance_reload(AppGlanceReloadSession *session, size_t limit, void *context);
 
 void app_glance_manager_refresh() {
-  //app_glance_reload(prv_app_glance_reload, NULL);
+  app_glance_reload(prv_app_glance_reload, NULL);
 }
 
 static void prv_app_glance_reload(AppGlanceReloadSession *session, size_t limit, void *context) {
