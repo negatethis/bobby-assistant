@@ -21,6 +21,7 @@
 #include "segments/segment_layer.h"
 #include "../util/thinking_layer.h"
 #include "../util/style.h"
+#include "../util/action_menu_crimes.h"
 #include "../vibes/haptic_feedback.h"
 
 #include <pebble.h>
@@ -47,12 +48,10 @@ struct SessionWindow {
   int last_prompt_end_offset;
   time_t query_time;
   AppTimer *timeout_handle;
-  ActionMenuLevel *action_menu;
+  int timeout;
+  char* starting_prompt;
+  char* last_prompt_label;
 };
-
-// this is a stupid hack because the way the session window is pushed is also stupid for some reason
-// since we only ever have one session window, we get away with it. but ew.
-static int s_timeout = 0;
 
 static void prv_window_load(Window *window);
 static void prv_window_appear(Window *window);
@@ -71,12 +70,20 @@ static void prv_refresh_timeout(SessionWindow* sw);
 static void prv_timed_out(void *ctx);
 static void prv_cancel_timeout(SessionWindow* sw);
 static void prv_action_menu_query(ActionMenu *action_menu, const ActionMenuItem *action, void *context);
+static void prv_action_menu_input(ActionMenu *action_menu, const ActionMenuItem *action, void *context);
 static void prv_action_menu_report_thread(ActionMenu *action_menu, const ActionMenuItem *action, void *context);
 
-void session_window_push(int timeout) {
+void session_window_push(int timeout, char *starting_prompt) {
   Window *window = window_create();
-  window_set_user_data(window, (void *)1);
-  s_timeout = timeout;
+  SessionWindow *sw = malloc(sizeof(SessionWindow));
+  memset(sw, 0, sizeof(SessionWindow));
+  window_set_user_data(window, sw);
+  sw->window = window;
+  sw->timeout = timeout;
+  if (starting_prompt != NULL) {
+    sw->starting_prompt = malloc(strlen(starting_prompt) + 1);
+    strncpy(sw->starting_prompt, starting_prompt, strlen(starting_prompt) + 1);
+  }
   window_set_window_handlers(window, (WindowHandlers) {
       .load = prv_window_load,
       .unload = prv_window_unload,
@@ -105,18 +112,18 @@ static void prv_destroy(SessionWindow *sw) {
   }
   free(sw->segment_layers);
   window_destroy(sw->window);
+  if (sw->starting_prompt) {
+    free(sw->starting_prompt);
+  }
   free(sw);
 }
 
 static void prv_window_load(Window *window) {
   Layer* root_layer = window_get_root_layer(window);
-  bool start_dictation = (bool)window_get_user_data(window);
   GSize window_size = layer_get_frame(window_get_root_layer(window)).size;
-  SessionWindow *sw = malloc(sizeof(SessionWindow));
-  memset(sw, 0, sizeof(SessionWindow));
-  sw->dictation_pending = start_dictation;
+  SessionWindow *sw = window_get_user_data(window);
+  sw->dictation_pending = true;
   APP_LOG(APP_LOG_LEVEL_INFO, "created SessionWindow %p.", sw);
-  sw->window = window;
   sw->manager = conversation_manager_create();
   conversation_manager_set_handler(sw->manager, prv_conversation_manager_handler, sw);
   sw->dictation = dictation_session_create(0, prv_dictation_status_callback, sw);
@@ -178,6 +185,13 @@ static void prv_window_load(Window *window) {
 
 static void prv_window_appear(Window *window) {
   SessionWindow *sw = (SessionWindow *)window_get_user_data(window);
+  if (sw->starting_prompt) {
+    conversation_manager_add_input(sw->manager, sw->starting_prompt);
+    sw->query_time = time(NULL);
+    free(sw->starting_prompt);
+    sw->starting_prompt = NULL;
+    sw->dictation_pending = false;
+  }
   if (sw->dictation_pending) {
     sw->dictation_pending = false;
     dictation_session_start(sw->dictation);
@@ -233,6 +247,9 @@ static void prv_update_thinking_layer(SessionWindow* sw) {
       visible = true;
     } else if (entry_type == EntryTypeResponse) {
       visible = !conversation_entry_get_response(entry)->complete;
+    } else if (entry_type == EntryTypeWidget) {
+      // Locally created widgets should still have a response coming after.
+      visible = conversation_entry_get_widget(entry)->locally_created;
     }
   }
 
@@ -361,38 +378,70 @@ static void prv_select_clicked(ClickRecognizerRef recognizer, void *context) {
   }
 }
 
+static void prv_destroy_action_menu(ActionMenu *action_menu, const ActionMenuItem *item, void *context) {
+  SessionWindow *sw = context;
+  action_menu_hierarchy_destroy(action_menu_get_root_level(action_menu), NULL, NULL);
+  if (sw->last_prompt_label) {
+    free(sw->last_prompt_label);
+    sw->last_prompt_label = NULL;
+  }
+}
+
 static void prv_select_long_pressed(ClickRecognizerRef recognizer, void *context) {
   SessionWindow* sw = context;
   if (!conversation_is_idle(conversation_manager_get_conversation(sw->manager))) {
     return;
   }
-  ActionMenuLevel *action_menu = action_menu_level_create(2);
-  action_menu_level_add_action(action_menu, "Prompt", prv_action_menu_query, sw);
-  action_menu_level_add_action(action_menu, "Report conversation", prv_action_menu_report_thread, sw);
+  ActionMenuLevel *action_menu = action_menu_level_create(5);
+  action_menu_level_add_action(action_menu, "\"Yes.\"", prv_action_menu_input, "Yes.");
+  action_menu_level_add_action(action_menu, "\"No.\"", prv_action_menu_input, "No.");
+  Conversation *conversation = conversation_manager_get_conversation(sw->manager);
+  ConversationEntry *entry = conversation_peek(conversation);
+  EntryType type = conversation_entry_get_type(entry);
+  int separator_index = 3;
+  if (type == EntryTypeError) {
+    ConversationEntry *last_prompt = conversation_get_last_of_type(conversation, EntryTypePrompt);
+    if (last_prompt != NULL) {
+      ConversationPrompt *prompt = conversation_entry_get_prompt(last_prompt);
+      sw->last_prompt_label = malloc(strlen(prompt->prompt) + 3);
+      snprintf(sw->last_prompt_label, strlen(prompt->prompt) + 3, "\"%s\"", prompt->prompt);
+      action_menu_level_add_action(action_menu, sw->last_prompt_label, prv_action_menu_input, prompt->prompt);
+      separator_index++;
+    }
+  }
+  action_menu_level_add_action(action_menu, "Dictate", prv_action_menu_query, NULL);
+  action_menu_level_set_separator_index(action_menu, separator_index);
+  action_menu_level_add_action(action_menu, "Report conversation", prv_action_menu_report_thread, NULL);
   ActionMenuConfig config = (ActionMenuConfig) {
     .root_level = action_menu,
     .colors = {
       .background = BRANDED_BACKGROUND_COLOUR,
       .foreground = gcolor_legible_over(BRANDED_BACKGROUND_COLOUR),
     },
-    .align = ActionMenuAlignCenter,
-    .context = sw
+    .align = ActionMenuAlignTop,
+    .context = sw,
+    .did_close = prv_destroy_action_menu,
   };
   vibe_haptic_feedback();
+  sw->query_time = time(NULL);
   action_menu_open(&config);
 }
 
 static void prv_action_menu_query(ActionMenu *action_menu, const ActionMenuItem *action, void *context) {
   SessionWindow* sw = context;
   dictation_session_start(sw->dictation);
-  action_menu_hierarchy_destroy(sw->action_menu, NULL, NULL);
-  sw->action_menu = NULL;
+}
+
+
+static void prv_action_menu_input(ActionMenu *action_menu, const ActionMenuItem *action, void *context) {
+  SessionWindow* sw = context;
+  const char* input = action_menu_item_get_action_data(action);
+  conversation_manager_add_input(sw->manager, input);
+  sw->query_time = time(NULL);
 }
 
 static void prv_action_menu_report_thread(ActionMenu *action_menu, const ActionMenuItem *action, void *context) {
   SessionWindow* sw = context;
-  action_menu_hierarchy_destroy(sw->action_menu, NULL, NULL);
-  sw->action_menu = NULL;
   report_window_push(conversation_get_thread_id(conversation_manager_get_conversation(sw->manager)));
 }
 
@@ -402,14 +451,14 @@ static void prv_scrolled_handler(ScrollLayer* scroll_layer, void* context) {
 }
 
 static void prv_refresh_timeout(SessionWindow* sw) {
-  if (s_timeout == 0) {
+  if (sw->timeout == 0) {
     return;
   }
   if (sw->timeout_handle) {
     app_timer_cancel(sw->timeout_handle);
   }
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Refreshed timeout");
-  sw->timeout_handle = app_timer_register(s_timeout, prv_timed_out, sw);
+  sw->timeout_handle = app_timer_register(sw->timeout, prv_timed_out, sw);
 }
 
 static void prv_cancel_timeout(SessionWindow* sw) {

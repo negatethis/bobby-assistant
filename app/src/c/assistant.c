@@ -30,8 +30,8 @@
 static RootWindow* s_root_window = NULL;
 
 static void prv_init(void) {
-  settings_init();
   version_store_current();
+  settings_init();
   conversation_manager_init();
   events_app_message_open();
   alarm_manager_init();
@@ -57,7 +57,7 @@ int main(void) {
       if (launch_reason() == APP_LAUNCH_QUICK_LAUNCH) {
         QuickLaunchBehaviour quick_launch_behaviour = settings_get_quick_launch_behaviour();
         if (quick_launch_behaviour != QuickLaunchBehaviourHomeScreen) {
-          session_window_push(quick_launch_behaviour == QuickLaunchBehaviourConverseWithTimeout ? QUICK_LAUNCH_TIMEOUT_MS : 0);
+          session_window_push(quick_launch_behaviour == QuickLaunchBehaviourConverseWithTimeout ? QUICK_LAUNCH_TIMEOUT_MS : 0, NULL);
         } else {
           s_root_window = root_window_create();
           root_window_push(s_root_window);

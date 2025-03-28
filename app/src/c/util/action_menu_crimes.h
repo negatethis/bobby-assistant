@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Google LLC
+* Copyright 2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,22 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef VERSION_H
-#define VERSION_H
+#pragma once
 
 #include <pebble.h>
-
-typedef struct __attribute__((__packed__)) {
-    uint8_t major;
-    uint8_t minor;
-} VersionInfo;
-
-void version_store_current();
-bool version_is_first_launch();
-bool version_is_updated();
-VersionInfo version_get_last_launch();
-VersionInfo version_get_current();
-int version_info_compare(VersionInfo a, VersionInfo b);
-const char* version_git_tag();
-
-#endif //VERSION_H
+void action_menu_level_set_separator_index(ActionMenuLevel *level, unsigned index);

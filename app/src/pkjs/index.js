@@ -22,7 +22,7 @@ var clayConfig = require('./config.json');
 var customConfigFunction = require('./custom_config');
 var config = require('./config');
 var reminders = require('./reminders');
-var feedback = require('./feedback');
+var feedback = require('./lib/feedback');
 var package_json = require('package.json');
 
 
@@ -82,8 +82,18 @@ function handleAppMessage(e) {
     }
 }
 
+function doCobbleWarning() {
+    if (window.cobble) {
+        console.log("WARNING: Running Bobby on Cobble is not supported, and has multiple known issues.");
+        Pebble.sendAppMessage({COBBLE_WARNING: 1});
+    }
+}
+
 Pebble.addEventListener("ready",
     function(e) {
+        // This happens before anything else because I don't trust Cobble to get through the normal flow,
+        // given how many things bizarrely don't work.
+        doCobbleWarning();
         console.log("Bobby " + package_json['version']);
         Pebble.getTimelineToken(function(token) {
             session.userToken = token;

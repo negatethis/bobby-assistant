@@ -1,7 +1,7 @@
 {
   "name": "Bobby",
   "author": "Rebble",
-  "version": "0.23.0",
+  "version": "1.1.0",
   "keywords": [
     "pebble-app"
   ],
@@ -93,7 +93,9 @@
       "TIMER_VIBE_PATTERN",
       "ALARM_VIBE_PATTERN",
       "REPORT_THREAD_UUID",
-      "REPORT_SEND_RESULT"
+      "REPORT_SEND_RESULT",
+      "COBBLE_WARNING",
+      "ACTION_FEEDBACK_SENT"
     ],
     "resources": {
       "media": [
@@ -101,6 +103,11 @@
           "file": "icons/menu_icon_default.png",
           "menuIcon": true,
           "name": "IMAGE_MENU_ICON",
+          "type": "bitmap"
+        },
+        {
+          "file": "icons/question_icon.png",
+          "name": "QUESTION_ICON",
           "type": "bitmap"
         },
         {
@@ -216,6 +223,11 @@
         {
           "file": "text/report_blurb.txt",
           "name": "REPORT_BLURB",
+          "type": "raw"
+        },
+        {
+          "file": "text/sample_prompts.txt",
+          "name": "SAMPLE_PROMPTS",
           "type": "raw"
         },
         {
@@ -453,9 +465,22 @@
           "type": "raw"
         },
         {
-          "file": "images/fence_pony.pdc",
-          "name": "FENCE_PONY",
-          "type": "raw"
+          "file": "images/fence_pony_color.png",
+          "name": "FENCE_PONY_BITMAP",
+          "type": "bitmap",
+          "memoryFormat": "2BitPalette",
+          "targetPlatforms": [
+            "basalt"
+          ]
+        },
+        {
+          "file": "images/fence_pony_bw.png",
+          "name": "FENCE_PONY_BITMAP",
+          "type": "bitmap",
+          "memoryFormat": "1BitPalette",
+          "targetPlatforms": [
+            "diorite"
+          ]
         }
       ]
     }

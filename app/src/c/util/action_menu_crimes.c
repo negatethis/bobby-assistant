@@ -14,22 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef VERSION_H
-#define VERSION_H
-
+#include "action_menu_crimes.h"
 #include <pebble.h>
 
-typedef struct __attribute__((__packed__)) {
-    uint8_t major;
-    uint8_t minor;
-} VersionInfo;
+typedef struct {
+  char padding[12];
+  unsigned separator_index;
+} ActionMenuLevelHack;
 
-void version_store_current();
-bool version_is_first_launch();
-bool version_is_updated();
-VersionInfo version_get_last_launch();
-VersionInfo version_get_current();
-int version_info_compare(VersionInfo a, VersionInfo b);
-const char* version_git_tag();
-
-#endif //VERSION_H
+void action_menu_level_set_separator_index(ActionMenuLevel *level, unsigned index) {
+  ActionMenuLevelHack *hack = (ActionMenuLevelHack *)level;
+  hack->separator_index = index;
+}
