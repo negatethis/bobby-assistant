@@ -8,10 +8,13 @@ services:
     restart: unless-stopped
     environment:
       - GEMINI_KEY=${GEMINI_KEY}
-      - MAPBOX_KEY=${MAPBOX_KEY}
       - EXCHANGE_RATE_API_KEY=${EXCHANGE_RATE_API_KEY}
       - USER_IDENTIFICATION_URL=http://faux-user-identifier:4090
       - REDIS_URL=redis://redis-bobby:6379
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/service_account.json
+    volumes:
+      - ./service_account.json:/app/service_account.json
+    
   redis-bobby:
     image: redis:6.0.9
     ports:

@@ -17,13 +17,14 @@ package functions
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/honeycombio/beeline-go"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/query"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/quota"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/util/photon"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/util/weather"
 	"google.golang.org/genai"
-	"strings"
 )
 
 type WeatherInput struct {
