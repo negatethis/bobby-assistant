@@ -39,7 +39,9 @@
           };
           default = bobby-assistant-service;
         };
-
+      }))
+    //
+    {
         nixosModules.default = { pkgs, lib, config, ... }:
           with lib;
           let
@@ -85,6 +87,6 @@
               };
             };
           };
-    }));
+    };
 }
 
