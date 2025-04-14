@@ -1,27 +1,27 @@
-# Tiny Assistant
+# Bobby Assistant
 
-Tiny Assistant is an LLM-based assistant that runs on your Pebble smartwatch,
+Bobby Assistant is an LLM-based assistant that runs on your Pebble smartwatch,
 if you still have a smartwatch that ceased production in 2016 lying around.
 
-![A screenshot from a Pebble smartwatch running the Tiny Assistant. The user asked for the time, the assistant responded that it was 3:59 PM.](./docs/screenshot.png)
+![A screenshot from a Pebble smartwatch running the Bobby Assistant. The user asked for the time, the assistant responded that it was 3:59 PM.](./docs/screenshot.png)
 
 ## Usage
 
 ### Server
 
-To use Tiny Assistant, you will need to run the server in `service/` somewhere
-your phone can reach.
+To use Bobby Assistant, you will need to run the server in `service/` somewhere your phone can reach.
+
+This fork incorporates changes from [jplexer/bobby-assistant](https://github.com/jplexer/bobby-assistant), which include switching the weather backend to Open Meteo and the Geoencoding backend to Photon.
 
 You will also need to set a few environment variables:
 
 - `GEMINI_KEY` - a key for Google's Gemini - you can get one at the
   [Google AI Studio](https://aistudio.google.com)
-- `REDIS_URL` - a URL for a functioning Redis server. No data is persisted
-  long-term, so a purely in-memory server is fine.
+- `REDIS_URL` - a URL for a functioning Redis server. No data is persisted long-term, so a purely in-memory server is fine.
+- `EXCHANGE_RATE_API_KEY` - a key from [ExchangeRate-API](https://www.exchangerate-api.com/)
 - `USER_IDENTIFICATION_URL` - a URL pointing to an instance of
   [user-identifier](https://github.com/pebble-dev/user-identifier) or [faux-user-identifier](https://github.com/jplexer/faux-user-identifier). A [nix-ready fork](https://github.com/negatethis/faux-user-identifier) of faux-user-identifier is available.
-- `MAPBOX_KEY` - an API key for [Mapbox](https://www.mapbox.com), which is
-  used for geocoding. If no key is provided, geocoding will be unavailable.
+- `GOOGLE_APPLICATION_CREDENTIALS` - Path to your Google Application service account credentials JSON file.
 
 #### Docker
 
@@ -31,33 +31,10 @@ Clone the git repo and `cd` into it.
 git clone https://github.com/negatethis/bobby-assistant
 cd bobby-assistant
 git checkout origin/nix-flake
+cd service
 ```
 
-Create a `docker-compose.yml` file and place the following into it:
-
-```yaml
-services:
-  bobby-assistant:
-    build:
-      context: .
-      dockerfile: Dockerfile-service
-    ports:
-     - "8080:8080"
-    environment:
-      - GEMINI_KEY="KEY"
-      - REDIS_URL="redis://redis:6379"
-      - USER_IDENTIFICATION_URL="URL"
-      - MAPBOX_KEY="KEY"
-    restart: unless-stopped      
-  redis:
-    image: redis:7.4.2-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-volumes:
-  redis_data:
-```
+Edit the example `compose.yml` file with the appropriate environment variables.
 
 Then use `docker compose` to bring up the server:
 
@@ -131,4 +108,3 @@ Apache 2.0; see [`LICENSE`](LICENSE) for details.
 This project is not an official Google project. It is not supported by
 Google and Google specifically disclaims all warranties as to its quality,
 merchantability, or fitness for a particular purpose.
-  
