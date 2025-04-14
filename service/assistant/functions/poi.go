@@ -17,15 +17,16 @@ package functions
 import (
 	"context"
 	"fmt"
+	"log"
+	"strings"
+
 	"github.com/honeycombio/beeline-go"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/query"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/quota"
-	"github.com/pebble-dev/bobby-assistant/service/assistant/util/mapbox"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/util/photon"
 	"github.com/umahmood/haversine"
 	"google.golang.org/api/places/v1"
 	"google.golang.org/genai"
-	"log"
-	"strings"
 )
 
 type POIQuery struct {
@@ -103,7 +104,7 @@ func searchPoi(ctx context.Context, quotaTracker *quota.Tracker, args any) any {
 	span.AddField("query", poiQuery.Query)
 	location := query.LocationFromContext(ctx)
 	if poiQuery.Location != "" {
-		coords, err := mapbox.GeocodeWithContext(ctx, poiQuery.Location)
+		coords, err := photon.GeocodeWithContext(ctx, poiQuery.Location)
 		if err != nil {
 			span.AddField("error", err)
 			return Error{Error: "Error finding location: " + err.Error()}

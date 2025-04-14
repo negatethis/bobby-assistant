@@ -3,8 +3,9 @@ package functions
 import (
 	"context"
 	"fmt"
+
 	"github.com/pebble-dev/bobby-assistant/service/assistant/query"
-	"github.com/pebble-dev/bobby-assistant/service/assistant/util/mapbox"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/util/photon"
 	"github.com/umahmood/haversine"
 	"google.golang.org/genai"
 
@@ -57,7 +58,7 @@ func getLocationImpl(ctx context.Context, quotaTracker *quota.Tracker, args any)
 	ctx, span := beeline.StartSpan(ctx, "get_location")
 	defer span.Send()
 	arg := args.(*GetLocationInput)
-	location, err := mapbox.GeocodeWithContext(ctx, arg.PlaceName)
+	location, err := photon.GeocodeWithContext(ctx, arg.PlaceName)
 	if err != nil {
 		return fmt.Errorf("failed to geocode %q: %w", arg.PlaceName, err)
 	}

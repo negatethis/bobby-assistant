@@ -17,13 +17,14 @@ package functions
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/honeycombio/beeline-go"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/query"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/quota"
-	"github.com/pebble-dev/bobby-assistant/service/assistant/util/mapbox"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/util/photon"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/util/weather"
 	"google.golang.org/genai"
-	"strings"
 )
 
 type WeatherInput struct {
@@ -99,7 +100,7 @@ func getWeather(ctx context.Context, quotaTracker *quota.Tracker, args any) any 
 		arg.Location = ""
 	}
 	if arg.Location != "" {
-		coords, err := mapbox.GeocodeWithContext(ctx, arg.Location)
+		coords, err := photon.GeocodeWithContext(ctx, arg.Location)
 		if err != nil {
 			span.AddField("error", err)
 			return Error{"Error finding location: " + err.Error()}
@@ -114,7 +115,6 @@ func getWeather(ctx context.Context, quotaTracker *quota.Tracker, args any) any 
 		lat, lon = location.Lat, location.Lon
 	}
 
-	_ = quotaTracker.ChargeCredits(ctx, quota.WeatherQueryCredits)
 	switch arg.Kind {
 	case "current":
 		return processCurrentWeather(ctx, lat, lon, arg.Unit)
@@ -150,7 +150,6 @@ func processDailyForecast(ctx context.Context, lat, lon float64, units string) a
 			"qpf_snow": forecast.QpfSnow[i],
 		}
 	}
-	response["temperatureUnit"] = forecast.TemperatureUnit
 	//response["source"] = "The Weather Channel"
 	return response
 }
@@ -181,7 +180,7 @@ func processHourlyForecast(ctx context.Context, lat, lon float64, units string) 
 		response = append(response, entry)
 	}
 	// the thing that is returned must not be an array.
-	return map[string]any{"response": response, "temperatureUnit": hourly.TemperatureUnit}
+	return map[string]any{"response": response}
 }
 
 func processCurrentWeather(ctx context.Context, lat, lon float64, units string) any {
