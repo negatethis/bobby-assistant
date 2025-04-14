@@ -25,12 +25,52 @@ You will also need to set a few environment variables:
 
 #### Docker
 
+Clone the git repo and `cd` into it.
+
+```
+git clone https://github.com/negatethis/bobby-assistant
+cd bobby-assistant
+git checkout origin/nix-flake
+```
+
+Create a `docker-compose.yml` file and place the following into it:
+
+```yaml
+services:
+  bobby-assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile-service
+    ports:
+     - "8080:8080"
+    environment:
+      - GEMINI_KEY="KEY"
+      - REDIS_URL="redis://redis:6379"
+      - USER_IDENTIFICATION_URL="URL"
+      - MAPBOX_KEY="KEY"
+    restart: unless-stopped      
+  redis:
+    image: redis:7.4.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+volumes:
+  redis_data:
+```
+
+Then use `docker compose` to bring up the server:
+
+```
+docker compose up -d  
+```
+
 #### Nix
 
 If you are using Nix and have the Flakes experimental feature activated, you can run the server with the following command:
 
 ```nix
-nix run github:negatethis/faux-user-identifier
+nix run github:negatethis/faux-user-identifier/nix-flake
 ```
 
 There is also a NixOS module exposed through the `flake.nix`. Here is an example on how to add it to your system's `flake.nix`:
@@ -76,7 +116,7 @@ This fork adds the ability to specify the Bobby API URI in the Bobby Pebble app'
 Once the `.pbw` is built, sideload it onto your Pebble, go to the settings page, and in the Advanced section you can specify your Bobby server's URI (a.k.a. don't include `http://` or `https://`).
 Since this is not an official Rebble build, I will not be setting the default value to Rebble's servers, as I don't want any bugs I could have accidentally introduced to affect their services or for users to go to them for my mistakes.
 
-There may also be a pre-compiled `.pbw` in the releases section if I learn how to use GitHub workflows.
+There may also be a pre-compiled `.pbw` in build artifacts or in the releases section if I learn how to use GitHub workflows.
 
 ## Contributing
 
