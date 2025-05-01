@@ -24,6 +24,7 @@ import (
 // TODO: something reasonable.
 
 type Config struct {
+<<<<<<< HEAD
 	BaseURL                string
 	GeminiKey              string
 	MapboxKey              string
@@ -36,6 +37,16 @@ type Config struct {
 	GoogleMapsStaticKey    string
 	GoogleMapsStaticSecret string
 	GoogleMapsStaticMapId  string
+=======
+	BaseURL               string
+	GeminiKey             string
+	MapboxKey             string
+	ExchangeRateApiKey    string
+	RedisURL              string
+	UserIdentificationURL string
+	HoneycombKey          string
+	DiscordFeedbackURL    string
+>>>>>>> origin/nix-flake
 }
 
 var c Config
@@ -54,6 +65,7 @@ func init() {
 	}
 
 	c = Config{
+<<<<<<< HEAD
 		BaseURL:                os.Getenv("BASE_URL"),
 		GeminiKey:              os.Getenv("GEMINI_KEY"),
 		MapboxKey:              os.Getenv("MAPBOX_KEY"),
@@ -66,5 +78,15 @@ func init() {
 		GoogleMapsStaticKey:    os.Getenv("GOOGLE_MAPS_STATIC_KEY"),
 		GoogleMapsStaticSecret: os.Getenv("GOOGLE_MAPS_STATIC_SECRET"),
 		GoogleMapsStaticMapId:  os.Getenv("GOOGLE_MAPS_STATIC_MAP_ID"),
+=======
+		BaseURL:               os.Getenv("BASE_URL"),
+		GeminiKey:             os.Getenv("GEMINI_KEY"),
+		MapboxKey:             os.Getenv("MAPBOX_KEY"),
+		ExchangeRateApiKey:    os.Getenv("EXCHANGE_RATE_API_KEY"),
+		RedisURL:              os.Getenv("REDIS_URL"),
+		UserIdentificationURL: os.Getenv("USER_IDENTIFICATION_URL"),
+		HoneycombKey:          os.Getenv("HONEYCOMB_KEY"),
+		DiscordFeedbackURL:    os.Getenv("DISCORD_FEEDBACK_URL"),
+>>>>>>> origin/nix-flake
 	}
 }

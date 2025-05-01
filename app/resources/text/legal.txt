@@ -3,7 +3,7 @@
 AI processing is provided by Google's Gemini under the terms at https://ai.google.dev/gemini-api/terms (Bobby is a 'paid service').
 
 ## Weather
-Weather data provided by The Weather Channel.
+Weather data provided by Open-Meteo.
 
 ## Wikipedia
 Some grounding information is fetched from Wikipedia during request processing. Wikipedia content is available under the Creative Commons Attribution-ShareAlike License.

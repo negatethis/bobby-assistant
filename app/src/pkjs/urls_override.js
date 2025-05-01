@@ -16,3 +16,6 @@
 
 // You can set exports.QUERY_URL or exports.QUOTA_URL in this file to override them without
 // needing to edit the main urls.js.
+
+exports.QUERY_URL = 'wss://bobby.funnyna.me/query';
+exports.QUOTA_URL = 'https://bobby.funnyna.me/quota';
