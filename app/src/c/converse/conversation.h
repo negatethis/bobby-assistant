@@ -18,6 +18,7 @@
 #define CONVERSATION_H
 
 #include <pebble.h>
+#include "../features.h"
 
 typedef struct Conversation Conversation;
 typedef struct ConversationEntry ConversationEntry;
@@ -37,6 +38,9 @@ typedef enum {
   ConversationWidgetTypeWeatherMultiDay,
   ConversationWidgetTypeTimer,
   ConversationWidgetTypeNumber,
+#if ENABLE_FEATURE_MAPS
+  ConversationWidgetTypeMap,
+#endif
 } ConversationWidgetType;
 
 typedef struct {
@@ -132,6 +136,11 @@ typedef struct {
 } ConversationWidgetNumber;
 
 typedef struct {
+  int image_id;
+  GPoint user_location;
+} ConversationWidgetMap;
+
+typedef struct {
   ConversationWidgetType type;
   bool locally_created;
   union {
@@ -140,10 +149,12 @@ typedef struct {
     ConversationWidgetWeatherMultiDay weather_multi_day;
     ConversationWidgetTimer timer;
     ConversationWidgetNumber number;
+    ConversationWidgetMap map;
   } widget;
 } ConversationWidget;
 
 typedef enum {
+  EntryTypeDeleted,
   EntryTypePrompt,
   EntryTypeResponse,
   EntryTypeThought,
@@ -172,6 +183,8 @@ ConversationEntry* conversation_entry_at_index(Conversation* conversation, int i
 ConversationEntry* conversation_peek(Conversation* conversation);
 ConversationEntry* conversation_get_last_of_type(Conversation* conversation, EntryType type);
 EntryType conversation_entry_get_type(ConversationEntry* entry);
+void conversation_delete_first_entry(Conversation* conversation);
+void conversation_delete_last_thought(Conversation* conversation);
 
 ConversationPrompt* conversation_entry_get_prompt(ConversationEntry* entry);
 ConversationResponse* conversation_entry_get_response(ConversationEntry* response);

@@ -23,14 +23,20 @@
 #include "widgets/weather_multi_day.h"
 #include "widgets/number.h"
 #include "widgets/timer.h"
+#include "widgets/map.h"
+#include "../../util/memory/sdk.h"
+#include "../../util/logging.h"
+#include "../../features.h"
 
 #include <pebble.h>
+
 
 
 #define CONTENT_FONT FONT_KEY_GOTHIC_24_BOLD
 #define NAME_HEIGHT 20
 
 typedef enum {
+  SegmentTypeNone,
   SegmentTypeMessage,
   SegmentTypeInfo,
   SegmentTypeWeatherSingleDayWidget,
@@ -38,6 +44,9 @@ typedef enum {
   SegmentTypeWeatherMultiDayWidget,
   SegmentTypeTimerWidget,
   SegmentTypeNumberWidget,
+#if ENABLE_FEATURE_MAPS
+  SegmentTypeMapWidget,
+#endif
 } SegmentType;
 
 typedef struct {
@@ -56,19 +65,22 @@ typedef struct {
     WeatherMultiDayWidget* weather_multi_day_widget;
     TimerWidget* timer_widget;
     NumberWidget* number_widget;
+#if ENABLE_FEATURE_MAPS
+    MapWidget* map_widget;
+#endif
   };
 } SegmentLayerData;
 
 static SegmentType prv_get_segment_type(ConversationEntry* entry);
 
 SegmentLayer* segment_layer_create(GRect rect, ConversationEntry* entry, bool assistant_label) {
-  Layer* layer = layer_create_with_data(rect, sizeof(SegmentLayerData));
+  Layer* layer = blayer_create_with_data(rect, sizeof(SegmentLayerData));
   SegmentLayerData* data = layer_get_data(layer);
   data->entry = entry;
   data->type = prv_get_segment_type(entry);
   GRect child_frame = GRect(0, 0, rect.size.w, rect.size.h);
   if (assistant_label) {
-    data->assistant_label_layer = text_layer_create(GRect(5, 0, rect.size.w, NAME_HEIGHT));
+    data->assistant_label_layer = btext_layer_create(GRect(5, 0, rect.size.w, NAME_HEIGHT));
     layer_add_child(layer, text_layer_get_layer(data->assistant_label_layer));
     text_layer_set_text(data->assistant_label_layer, "Bobby");
     child_frame = GRect(0, NAME_HEIGHT, rect.size.w, rect.size.h - NAME_HEIGHT);
@@ -76,6 +88,8 @@ SegmentLayer* segment_layer_create(GRect rect, ConversationEntry* entry, bool as
     data->assistant_label_layer = NULL;
   }
   switch (data->type) {
+    case SegmentTypeNone:
+      break;
     case SegmentTypeMessage:
       data->message_layer = message_layer_create(child_frame, entry);
       break;
@@ -97,6 +111,11 @@ SegmentLayer* segment_layer_create(GRect rect, ConversationEntry* entry, bool as
     case SegmentTypeNumberWidget:
       data->number_widget = number_widget_create(child_frame, entry);
       break;
+#if ENABLE_FEATURE_MAPS
+    case SegmentTypeMapWidget:
+      data->map_widget = map_widget_create(child_frame, entry);
+      break;
+#endif
   }
   layer_add_child(layer, data->layer);
   GSize child_size = layer_get_frame(data->layer).size;
@@ -109,9 +128,11 @@ SegmentLayer* segment_layer_create(GRect rect, ConversationEntry* entry, bool as
 }
 
 void segment_layer_destroy(SegmentLayer* layer) {
-  APP_LOG(APP_LOG_LEVEL_INFO, "destroying SegmentLayer %p.", layer);
+  BOBBY_LOG(APP_LOG_LEVEL_INFO, "destroying SegmentLayer %p.", layer);
   SegmentLayerData* data = layer_get_data(layer);
   switch (data->type) {
+    case SegmentTypeNone:
+      break;
     case SegmentTypeMessage:
       message_layer_destroy(data->message_layer);
       break;
@@ -133,6 +154,11 @@ void segment_layer_destroy(SegmentLayer* layer) {
     case SegmentTypeNumberWidget:
       number_widget_destroy(data->number_widget);
       break;
+#if ENABLE_FEATURE_MAPS
+    case SegmentTypeMapWidget:
+      map_widget_destroy(data->map_widget);
+      break;
+#endif
   }
   if (data->assistant_label_layer) {
     text_layer_destroy(data->assistant_label_layer);
@@ -148,6 +174,8 @@ ConversationEntry* segment_layer_get_entry(SegmentLayer* layer) {
 void segment_layer_update(SegmentLayer* layer) {
   SegmentLayerData* data = layer_get_data(layer);
   switch (data->type) {
+    case SegmentTypeNone:
+      break;
     case SegmentTypeMessage:
       message_layer_update(data->message_layer);
       break;
@@ -169,6 +197,11 @@ void segment_layer_update(SegmentLayer* layer) {
     case SegmentTypeNumberWidget:
       number_widget_update(data->number_widget);
       break;
+#if ENABLE_FEATURE_MAPS
+    case SegmentTypeMapWidget:
+      map_widget_update(data->map_widget);
+      break;
+#endif
   }
   GSize child_size = layer_get_frame(data->layer).size;
   GPoint origin = layer_get_frame(layer).origin;
@@ -181,6 +214,8 @@ void segment_layer_update(SegmentLayer* layer) {
 
 static SegmentType prv_get_segment_type(ConversationEntry* entry) {
   switch (conversation_entry_get_type(entry)) {
+    case EntryTypeDeleted:
+      return SegmentTypeNone;
     case EntryTypePrompt:
     case EntryTypeResponse:
       return SegmentTypeMessage;
@@ -200,9 +235,13 @@ static SegmentType prv_get_segment_type(ConversationEntry* entry) {
           return SegmentTypeTimerWidget;
         case ConversationWidgetTypeNumber:
           return SegmentTypeNumberWidget;
+#if ENABLE_FEATURE_MAPS
+        case ConversationWidgetTypeMap:
+          return SegmentTypeMapWidget;
+#endif
       }
       break;
   }
-  APP_LOG(APP_LOG_LEVEL_ERROR, "Unknown entry type %d.", conversation_entry_get_type(entry));
-  return SegmentTypeMessage;
+  BOBBY_LOG(APP_LOG_LEVEL_WARNING, "Unknown entry type %d.", conversation_entry_get_type(entry));
+  return SegmentTypeNone;
 }

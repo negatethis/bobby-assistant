@@ -16,6 +16,7 @@ package query
 
 import (
 	"context"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/persistence"
 	"net/url"
 	"strconv"
 	"strings"
@@ -36,6 +37,10 @@ type queryContext struct {
 	preferredLanguage string
 	preferredUnits    string
 	threadId          string
+	threadContext     *persistence.ThreadContext
+	supportsColour    bool
+	screenWidth       int
+	screenHeight      int
 }
 
 type qckt int
@@ -60,6 +65,9 @@ func ContextWith(ctx context.Context, q url.Values) context.Context {
 	preferredLanguage := q.Get("lang")
 	preferredUnits := q.Get("units")
 	threadId := q.Get("threadId")
+	supportsColour := q.Get("supportsColour") == "true"
+	screenWidth, _ := strconv.Atoi(q.Get("screenWidth"))
+	screenHeight, _ := strconv.Atoi(q.Get("screenHeight"))
 	qc := queryContext{
 		location:          location,
 		tzOffset:          offset,
@@ -68,6 +76,10 @@ func ContextWith(ctx context.Context, q url.Values) context.Context {
 		preferredLanguage: preferredLanguage,
 		preferredUnits:    preferredUnits,
 		threadId:          threadId,
+		threadContext:     persistence.NewContext(),
+		supportsColour:    supportsColour,
+		screenWidth:       screenWidth,
+		screenHeight:      screenHeight,
 	}
 	ctx = context.WithValue(ctx, queryContextKey, qc)
 	return ctx
@@ -111,4 +123,23 @@ func SupportsWidget(ctx context.Context, widget string) bool {
 
 func ThreadIdFromContext(ctx context.Context) string {
 	return ctx.Value(queryContextKey).(queryContext).threadId
+}
+
+func ThreadContextFromContext(ctx context.Context) *persistence.ThreadContext {
+	return ctx.Value(queryContextKey).(queryContext).threadContext
+}
+
+func SupportsColourFromContext(ctx context.Context) bool {
+	return ctx.Value(queryContextKey).(queryContext).supportsColour
+}
+
+func ScreenWidthFromContext(ctx context.Context) int {
+	return ctx.Value(queryContextKey).(queryContext).screenWidth
+}
+
+func ContextWithThread(ctx context.Context, threadContext *persistence.ThreadContext) context.Context {
+	qc := ctx.Value(queryContextKey).(queryContext)
+	qc.threadContext = threadContext
+	ctx = context.WithValue(ctx, queryContextKey, qc)
+	return ctx
 }

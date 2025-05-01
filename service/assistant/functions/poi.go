@@ -20,6 +20,7 @@ import (
 	"github.com/honeycombio/beeline-go"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/query"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/quota"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/util"
 	"github.com/pebble-dev/bobby-assistant/service/assistant/util/mapbox"
 	"github.com/umahmood/haversine"
 	"google.golang.org/api/places/v1"
@@ -28,50 +29,31 @@ import (
 	"strings"
 )
 
-type POIQuery struct {
-	Location     string
-	Query        string
-	LanguageCode string
-	Units        string
-}
-
-type POI struct {
-	Name               string
-	Address            string
-	Categories         []string
-	OpeningHours       []string
-	CurrentlyOpen      bool
-	PhoneNumber        string
-	PriceLevel         string
-	StarRating         float64
-	RatingCount        int64
-	DistanceKilometers float64 `json:"DistanceKilometers,omitempty"`
-	DistanceMiles      float64 `json:"DistanceMiles,omitempty"`
-}
-
 type POIResponse struct {
-	Results []POI
+	Results []util.POI
 	Warning string `json:"CriticalRequirement,omitempty"`
 }
 
 func init() {
+	f := false
+	t := true
 	registerFunction(Registration{
 		Definition: genai.FunctionDeclaration{
 			Name:        "poi",
 			Description: "Look up points of interest near the user's location (or another named location).",
 			Parameters: &genai.Schema{
 				Type:     genai.TypeObject,
-				Nullable: false,
+				Nullable: &f,
 				Properties: map[string]*genai.Schema{
 					"query": {
 						Type:        genai.TypeString,
 						Description: "The search query to use to find points of interest. Could be a name (e.g. \"McDonald's\"), a category (e.g. \"restaurant\" or \"pizza\"), or another search term.",
-						Nullable:    false,
+						Nullable:    &f,
 					},
 					"location": {
 						Type:        genai.TypeString,
 						Description: "The name of the location to search near. If not provided, the user's current location will be used. Assume that no location should be provided unless explicitly requested: not providing one results in more accurate answers.",
-						Nullable:    true,
+						Nullable:    &t,
 					},
 					"languageCode": {
 						Type:        genai.TypeString,
@@ -83,12 +65,12 @@ func init() {
 		},
 		Fn:        searchPoi,
 		Thought:   searchPoiThought,
-		InputType: POIQuery{},
+		InputType: util.POIQuery{},
 	})
 }
 
 func searchPoiThought(args any) string {
-	poiQuery := args.(*POIQuery)
+	poiQuery := args.(*util.POIQuery)
 	if poiQuery.Location != "" {
 		location, _, _ := strings.Cut(poiQuery.Location, ",")
 		return fmt.Sprintf("Looking for %s near %s...", poiQuery.Query, location)
@@ -99,7 +81,14 @@ func searchPoiThought(args any) string {
 func searchPoi(ctx context.Context, quotaTracker *quota.Tracker, args any) any {
 	ctx, span := beeline.StartSpan(ctx, "search_poi")
 	defer span.Send()
-	poiQuery := args.(*POIQuery)
+	threadContext := query.ThreadContextFromContext(ctx)
+	poiQuery := args.(*util.POIQuery)
+	if threadContext.ContextStorage.PoiQuery != nil && poiQuery.Equal(threadContext.ContextStorage.PoiQuery) {
+		log.Printf("Reusing the POI results from before.")
+		return &POIResponse{
+			Results: threadContext.ContextStorage.POIs,
+		}
+	}
 	span.AddField("query", poiQuery.Query)
 	location := query.LocationFromContext(ctx)
 	if poiQuery.Location != "" {
@@ -159,7 +148,7 @@ func searchPoi(ctx context.Context, quotaTracker *quota.Tracker, args any) any {
 
 	log.Printf("Found %d POIs", len(results.Places))
 
-	var pois []POI
+	var pois []util.POI
 	var attributions map[string]any
 	for _, place := range results.Places {
 		var distMiles, distKm float64
@@ -169,7 +158,7 @@ func searchPoi(ctx context.Context, quotaTracker *quota.Tracker, args any) any {
 				haversine.Coord{userLocation.Lat, userLocation.Lon},
 				haversine.Coord{place.Location.Latitude, place.Location.Longitude})
 		}
-		poi := POI{
+		poi := util.POI{
 			Name:               place.DisplayName.Text,
 			Address:            place.ShortFormattedAddress,
 			Categories:         place.Types,
@@ -179,6 +168,10 @@ func searchPoi(ctx context.Context, quotaTracker *quota.Tracker, args any) any {
 			RatingCount:        place.UserRatingCount,
 			DistanceMiles:      distMiles,
 			DistanceKilometers: distKm,
+			Coordinates: util.Coords{
+				Latitude:  place.Location.Latitude,
+				Longitude: place.Location.Longitude,
+			},
 		}
 		if place.CurrentOpeningHours != nil {
 			poi.OpeningHours = place.CurrentOpeningHours.WeekdayDescriptions
@@ -191,6 +184,9 @@ func searchPoi(ctx context.Context, quotaTracker *quota.Tracker, args any) any {
 			}
 		}
 	}
+
+	threadContext.ContextStorage.POIs = pois
+	threadContext.ContextStorage.PoiQuery = poiQuery
 
 	var attributionList []string
 	for provider := range attributions {

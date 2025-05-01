@@ -17,8 +17,12 @@ package persistence
 import (
 	"context"
 	"encoding/json"
+	"github.com/google/uuid"
+	"github.com/honeycombio/beeline-go"
+	"github.com/pebble-dev/bobby-assistant/service/assistant/util"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/genai"
+	"time"
 )
 
 type SerializedMessage struct {
@@ -28,14 +32,43 @@ type SerializedMessage struct {
 	FunctionResponse *genai.FunctionResponse `json:"functionResponse,omitempty"`
 }
 
-func LoadThread(context context.Context, r *redis.Client, id string) ([]SerializedMessage, error) {
-	j, err := r.Get(context, "thread:"+id).Result()
+type StoredContext struct {
+	PoiQuery *util.POIQuery `json:"poiQuery"`
+	POIs     []util.POI     `json:"pois"`
+}
+
+type ThreadContext struct {
+	ThreadId       uuid.UUID           `json:"threadId"`
+	Messages       []SerializedMessage `json:"messages"`
+	ContextStorage StoredContext       `json:"contextStorage"`
+}
+
+func NewContext() *ThreadContext {
+	return &ThreadContext{}
+}
+
+func LoadThread(ctx context.Context, r *redis.Client, id string) (*ThreadContext, error) {
+	ctx, span := beeline.StartSpan(ctx, "load_thread")
+	defer span.Send()
+	j, err := r.Get(ctx, "thread:"+id).Result()
 	if err != nil {
 		return nil, err
 	}
-	var messages []SerializedMessage
-	if err := json.Unmarshal([]byte(j), &messages); err != nil {
+	var threadContext ThreadContext
+	if err := json.Unmarshal([]byte(j), &threadContext); err != nil {
 		return nil, err
 	}
-	return messages, nil
+	return &threadContext, nil
+}
+
+func StoreThread(ctx context.Context, r *redis.Client, thread *ThreadContext) error {
+	ctx, span := beeline.StartSpan(ctx, "store_thread")
+	defer span.Send()
+	j, err := json.Marshal(thread)
+	if err != nil {
+		span.AddField("error", err)
+		return err
+	}
+	r.Set(ctx, "thread:"+thread.ThreadId.String(), j, 10*time.Minute)
+	return nil
 }

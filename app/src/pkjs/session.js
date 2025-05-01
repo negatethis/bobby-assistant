@@ -14,10 +14,14 @@
  * limitations under the License.
  */
 
+var LOGGING_ENABLED = false;
+
 var location = require('./location');
 var config = require('./config');
 var actions = require('./actions');
 var widgets = require('./widgets');
+var messageQueue = require('./lib/message_queue').Queue;
+var features = require('./features');
 
 var API_URL = require('./urls').QUERY_URL;
 var package_json = require('package.json');
@@ -26,9 +30,7 @@ function Session(prompt, threadId) {
     this.prompt = prompt;
     this.threadId = threadId;
     this.ws = undefined;
-    this.queue = [];
     this.hasOpenDialog = false;
-    this.messagesInFlight = 0;
 }
 
 function getSettings() {
@@ -36,6 +38,9 @@ function getSettings() {
 }
 
 Session.prototype.run = function() {
+    if (LOGGING_ENABLED) {
+        messageQueue.startLogging();
+    }
     console.log("Opening websocket connection...");
     var url = API_URL + '?prompt=' + encodeURIComponent(this.prompt) + '&token=' + exports.userToken;
     if (location.isReady() && config.isLocationEnabled()) {
@@ -51,10 +56,57 @@ Session.prototype.run = function() {
     url += '&tzOffset=' + (-(new Date()).getTimezoneOffset());
     url += '&actions=' + actions.getSupportedActions().join(',');
     url += '&widgets=weather,timer,number';
+    if (features.FEATURE_MAP_WIDGET) {
+        url += ',map';
+    }
     var settings = getSettings();
     url += '&units=' + settings['UNIT_PREFERENCE'] || '';
     url += '&lang=' + settings['LANGUAGE_CODE'] || '';
     url += '&version=' + package_json['version'];
+
+    // Figure out our colour support
+    if (Pebble.getActiveWatchInfo) {
+        var platform = Pebble.getActiveWatchInfo().platform;
+        var supportsColour;
+        var screenWidth;
+        var screenHeight;
+        switch (platform) {
+            case 'aplite':
+                supportsColour = false;
+                screenWidth = 144;
+                screenHeight = 168;
+                break;
+            case 'basalt':
+                supportsColour = true;
+                screenWidth = 144;
+                screenHeight = 168;
+                break;
+            case 'chalk':
+                supportsColour = true;
+                screenWidth = 180;
+                screenHeight = 180;
+                break;
+            case 'diorite':
+                supportsColour = false;
+                screenWidth = 144;
+                screenHeight = 168;
+                break;
+            case 'emery':
+                supportsColour = true;
+                screenWidth = 200;
+                screenHeight = 228;
+                break;
+            default:
+                console.log('Unknown platform: ' + platform);
+                // generally a safe bet.
+                supportsColour = false;
+                screenWidth = 144;
+                screenHeight = 168;
+        }
+        url += '&supportsColour=' + supportsColour;
+        url += '&screenWidth=' + screenWidth;
+        url += '&screenHeight=' + screenHeight;
+    }
 
     console.log(url);
     this.ws = new WebSocket(url);
@@ -108,6 +160,10 @@ Session.prototype.handleMessage = function(event) {
         this.enqueue({
             CHAT_DONE: true
         });
+        if (LOGGING_ENABLED) {
+            console.log(JSON.stringify(messageQueue.getLog()));
+            messageQueue.stopLogging();
+        }
     } else if (message[0] == 'a') {
         actions.handleAction(this, this.ws, message.substring(1));
     } else if (message[0] == 't') {
@@ -126,35 +182,11 @@ Session.prototype.processWidget = function(widgetData) {
 }
 
 Session.prototype.enqueue = function(message) {
-    this.queue.push(message);
-    if (this.messagesInFlight < 10) {
-        console.log('sending immediately, messages in flight: ' + this.messagesInFlight);
-        this.dequeue();
-    } else {
-        console.log('enqueued, queue length: ' + this.queue.length);
-    }
+    messageQueue.enqueue(message);
 }
 
 Session.prototype.dequeue = function() {
-    var m = this.queue.shift();
-    console.log('sending message, remaining: ' + this.queue.length);
-    this.messagesInFlight++;
-    Pebble.sendAppMessage(m, (function() {
-        this.messagesInFlight--;
-        console.log('sent successfully');
-        if (this.queue.length > 0) {
-            console.log('next');
-            this.dequeue();
-        } else {
-            console.log('done');
-        }
-    }).bind(this), (function() {
-        this.messagesInFlight--;
-        console.log('failed, message lost. carrying on shortly.');
-        setTimeout(function() {
-            this.dequeue();
-            }, 10);
-    }).bind(this));
+    messageQueue.dequeue();
 }
 
 Session.prototype.handleClose = function(event) {

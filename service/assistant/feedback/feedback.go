@@ -44,6 +44,7 @@ type ReportedThread struct {
 	ReportTime       time.Time                       `json:"report_time"`
 	ReportText       string                          `json:"report_text"`
 	ThreadContent    []persistence.SerializedMessage `json:"thread_content"`
+	ContextStorage   persistence.StoredContext       `json:"thread_context"`
 }
 
 func HandleFeedback(rw http.ResponseWriter, r *http.Request) {
@@ -74,21 +75,28 @@ func HandleReport(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	rd := storage.GetRedis()
-	var messages []persistence.SerializedMessage
+	var threadContext *persistence.ThreadContext
 	if req.ThreadUUID != "" {
 		var err error
-		messages, err = persistence.LoadThread(ctx, rd, req.ThreadUUID)
+		threadContext, err = persistence.LoadThread(ctx, rd, req.ThreadUUID)
 		if err != nil {
 			log.Printf("Error loading thread: %v", err)
 			http.Error(rw, err.Error(), http.StatusGone)
 			return
 		}
 	}
+	var messages []persistence.SerializedMessage
+	var contextStorage persistence.StoredContext
+	if threadContext != nil {
+		messages = threadContext.Messages
+		contextStorage = threadContext.ContextStorage
+	}
 
 	report := ReportedThread{
 		OriginalThreadID: req.ThreadUUID,
 		ReportTime:       time.Now(),
 		ThreadContent:    messages,
+		ContextStorage:   contextStorage,
 		ReportText:       req.Text,
 	}
 

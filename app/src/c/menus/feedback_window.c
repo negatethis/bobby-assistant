@@ -18,7 +18,10 @@
 #include "../util/vector_sequence_layer.h"
 #include "../util/formatted_text_layer.h"
 #include "../util/result_window.h"
+#include "../util/strings.h"
 #include "../util/style.h"
+#include "../util/memory/malloc.h"
+#include "../util/memory/sdk.h"
 #include "../alarms/manager.h"
 #include "../version/version.h"
 #include <pebble.h>
@@ -47,8 +50,8 @@ static void prv_select_clicked(ClickRecognizerRef recognizer, void *context);
 static void prv_app_message_received(DictionaryIterator *iterator, void *context);
 
 void feedback_window_push() {
-  Window *window = window_create();
-  FeedbackWindowData *data = malloc(sizeof(FeedbackWindowData));
+  Window *window = bwindow_create();
+  FeedbackWindowData *data = bmalloc(sizeof(FeedbackWindowData));
   window_set_user_data(window, data);
   window_set_window_handlers(window, (WindowHandlers) {
     .load = prv_window_load,
@@ -62,11 +65,11 @@ static void prv_window_load(Window *window) {
   GRect bounds = layer_get_bounds(window_get_root_layer(window));
   Layer *layer = window_get_root_layer(window);
 
-  data->status_bar_layer = status_bar_layer_create();
+  data->status_bar_layer = bstatus_bar_layer_create();
   layer_add_child(layer, status_bar_layer_get_layer(data->status_bar_layer));
   bobby_status_bar_config(data->status_bar_layer);
 
-  data->scroll_layer = scroll_layer_create(GRect(0, STATUS_BAR_LAYER_HEIGHT, bounds.size.w, bounds.size.h - STATUS_BAR_LAYER_HEIGHT));
+  data->scroll_layer = bscroll_layer_create(GRect(0, STATUS_BAR_LAYER_HEIGHT, bounds.size.w, bounds.size.h - STATUS_BAR_LAYER_HEIGHT));
   scroll_layer_set_callbacks(data->scroll_layer, (ScrollLayerCallbacks) {
     .click_config_provider = prv_click_config_provider,
   });
@@ -74,7 +77,7 @@ static void prv_window_load(Window *window) {
   scroll_layer_set_context(data->scroll_layer, window);
   scroll_layer_set_click_config_onto_window(data->scroll_layer, window);
   layer_add_child(layer, scroll_layer_get_layer(data->scroll_layer));
-  data->scroll_indicator_down = layer_create(GRect(0, bounds.size.h - STATUS_BAR_LAYER_HEIGHT, bounds.size.w, STATUS_BAR_LAYER_HEIGHT));
+  data->scroll_indicator_down = blayer_create(GRect(0, bounds.size.h - STATUS_BAR_LAYER_HEIGHT, bounds.size.w, STATUS_BAR_LAYER_HEIGHT));
   layer_add_child(layer, data->scroll_indicator_down);
   ContentIndicator* indicator = scroll_layer_get_content_indicator(data->scroll_layer);
   const ContentIndicatorConfig up_config = (ContentIndicatorConfig) {
@@ -100,7 +103,7 @@ static void prv_window_load(Window *window) {
 
   ResHandle blurb_handle = resource_get_handle(RESOURCE_ID_FEEDBACK_BLURB);
   size_t blurb_length = resource_size(blurb_handle);
-  data->blurb = malloc(blurb_length + 1);
+  data->blurb = bmalloc(blurb_length + 1);
   resource_load(blurb_handle, (uint8_t *)data->blurb, blurb_length);
   data->blurb[blurb_length] = '\0';
 
@@ -111,13 +114,13 @@ static void prv_window_load(Window *window) {
   scroll_layer_add_child(data->scroll_layer, formatted_text_layer_get_layer(data->text_layer));
   scroll_layer_set_content_size(data->scroll_layer, GSize(bounds.size.w, text_size.h + 10));
 
-  data->select_indicator = gbitmap_create_with_resource(RESOURCE_ID_BUTTON_INDICATOR);
-  data->select_indicator_layer = bitmap_layer_create(GRect(bounds.size.w - 5, bounds.size.h / 2 - 10, 5, 20));
+  data->select_indicator = bgbitmap_create_with_resource(RESOURCE_ID_BUTTON_INDICATOR);
+  data->select_indicator_layer = bbitmap_layer_create(GRect(bounds.size.w - 5, bounds.size.h / 2 - 10, 5, 20));
   layer_add_child(layer, bitmap_layer_get_layer(data->select_indicator_layer));
   bitmap_layer_set_bitmap(data->select_indicator_layer, data->select_indicator);
   bitmap_layer_set_compositing_mode(data->select_indicator_layer, GCompOpSet);
 
-  data->loading_sequence = gdraw_command_sequence_create_with_resource(RESOURCE_ID_RUNNING_PONY);
+  data->loading_sequence = bgdraw_command_sequence_create_with_resource(RESOURCE_ID_RUNNING_PONY);
   GSize pony_size = gdraw_command_sequence_get_bounds_size(data->loading_sequence);
   data->loading_layer = vector_sequence_layer_create(GRect(bounds.size.w / 2 - pony_size.w / 2, bounds.size.h / 2 - pony_size.h / 2, pony_size.w, pony_size.h));
   vector_sequence_layer_set_sequence(data->loading_layer, data->loading_sequence);
@@ -174,6 +177,7 @@ static void prv_dictation_status_callback(DictationSession *session, DictationSe
   vector_sequence_layer_play(data->loading_layer);
   DictionaryIterator *iter;
   app_message_outbox_begin(&iter);
+  strings_fix_android_bridge_bodge(transcription);
   dict_write_cstring(iter, MESSAGE_KEY_FEEDBACK_TEXT, transcription);
   VersionInfo version = version_get_current();
   dict_write_int8(iter, MESSAGE_KEY_FEEDBACK_APP_MAJOR, version.major);
@@ -190,10 +194,10 @@ static void prv_app_message_received(DictionaryIterator *iter, void *context) {
   }
   int result = tuple->value->int32;
   if (result == 0) {
-    GDrawCommandImage *image = gdraw_command_image_create_with_resource(RESOURCE_ID_SENT_IMAGE);
+    GDrawCommandImage *image = bgdraw_command_image_create_with_resource(RESOURCE_ID_SENT_IMAGE);
     result_window_push("Sent", "Thank you!", image, BRANDED_BACKGROUND_COLOUR);
   } else {
-    GDrawCommandImage *image = gdraw_command_image_create_with_resource(RESOURCE_ID_FAILED_PONY);
+    GDrawCommandImage *image = bgdraw_command_image_create_with_resource(RESOURCE_ID_FAILED_PONY);
     result_window_push("Error", "There was a problem 🙁", image, COLOR_FALLBACK(GColorSunsetOrange, GColorWhite));
   }
   window_stack_remove(window, false);

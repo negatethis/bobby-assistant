@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/honeycombio/beeline-go"
 	"google.golang.org/genai"
@@ -65,11 +66,15 @@ func DetermineActions(ctx context.Context, qt *quota.Tracker, message string) ([
 		return nil, err
 	}
 
-	temperature := 0.1
-	response, err := geminiClient.Models.GenerateContent(ctx, "models/gemini-2.0-flash-lite", []*genai.Content{
-		genai.NewUserContentFromText(message),
+	temperature := float32(0.1)
+	f := false
+	// We don't want to hold up the user for too long - if the model is responding slowly, just give up.
+	// Under normal circumstances, the P99 response time is around 600ms.
+	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, 1500*time.Millisecond)
+	response, err := geminiClient.Models.GenerateContent(timeoutCtx, "models/gemini-2.0-flash-lite", []*genai.Content{
+		genai.NewContentFromText(message, genai.RoleUser),
 	}, &genai.GenerateContentConfig{
-		SystemInstruction: genai.NewUserContentFromText(SYSTEM_PROMPT),
+		SystemInstruction: genai.NewContentFromText(SYSTEM_PROMPT, genai.RoleUser),
 		Temperature:       &temperature,
 		ResponseMIMEType:  "application/json",
 		ResponseSchema: &genai.Schema{
@@ -80,18 +85,19 @@ func DetermineActions(ctx context.Context, qt *quota.Tracker, message string) ([
 					"topic": {
 						Type:     genai.TypeString,
 						Enum:     []string{"alarm", "timer", "reminder"},
-						Nullable: false,
+						Nullable: &f,
 					},
 					"action": {
 						Type:     genai.TypeString,
 						Enum:     []string{"setting", "reporting"},
-						Nullable: false,
+						Nullable: &f,
 					},
 				},
 				Required: []string{"topic", "action"},
 			},
 		},
 	})
+	cancelTimeout()
 	if err != nil {
 		return nil, err
 	}
@@ -99,20 +105,13 @@ func DetermineActions(ctx context.Context, qt *quota.Tracker, message string) ([
 	inputTokens := 0
 	outputTokens := 0
 	if response.UsageMetadata != nil {
-		if response.UsageMetadata.PromptTokenCount != nil {
-			inputTokens = int(*response.UsageMetadata.PromptTokenCount)
-		}
-		if response.UsageMetadata.CandidatesTokenCount != nil {
-			outputTokens = int(*response.UsageMetadata.CandidatesTokenCount)
-		}
+		inputTokens = int(response.UsageMetadata.PromptTokenCount)
+		outputTokens = int(response.UsageMetadata.CandidatesTokenCount)
 	}
 
 	_ = qt.ChargeCredits(ctx, inputTokens*quota.LiteInputTokenCredits+outputTokens*quota.LiteOutputTokenCredits)
 
-	text, err := response.Text()
-	if err != nil {
-		return nil, err
-	}
+	text := response.Text()
 
 	var checks []ActionCheck
 	if err := json.Unmarshal([]byte(text), &checks); err != nil {

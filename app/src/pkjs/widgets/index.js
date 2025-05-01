@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+var map = require('./map');
 var weather = require('./weather');
 var timer = require('./timer');
 var highlights = require('./highlights');
+var features = require('../features');
 
 var widgetMap = {
     'timer': timer.timer,
@@ -24,6 +26,10 @@ var widgetMap = {
     'weather-single-day': weather.singleDay,
     'weather-current': weather.current,
     'weather-multi-day': weather.multiDay
+}
+
+if (features.FEATURE_MAP_WIDGET) {
+    widgetMap['map'] = map.map;
 }
 
 exports.handleWidget = function(session, widgetString) {

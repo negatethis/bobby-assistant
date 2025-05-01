@@ -96,7 +96,9 @@ func (ps *PromptSession) Run(ctx context.Context) {
 	})
 
 	if ps.originalThreadId != "" {
-		oldMessages, err := ps.restoreThread(ctx, ps.originalThreadId)
+		var threadContext *persistence.ThreadContext
+		ctx, threadContext, err = ps.restoreContext(ctx, ps.originalThreadId)
+		oldMessages := ps.restoreThread(threadContext)
 		if err != nil {
 			log.Printf("error restoring thread: %v\n", err)
 			_ = ps.conn.Close(websocket.StatusInternalError, "Error restoring thread.")
@@ -105,6 +107,7 @@ func (ps *PromptSession) Run(ctx context.Context) {
 			messages = append(oldMessages, messages...)
 		}
 	}
+	query.ThreadContextFromContext(ctx).ThreadId = ps.threadId
 	user, err := quota.GetUserInfo(ctx, ps.userToken)
 	if err != nil {
 		log.Printf("get user info failed: %v\n", err)
@@ -145,13 +148,17 @@ func (ps *PromptSession) Run(ctx context.Context) {
 			}
 			systemPrompt := ps.generateSystemPrompt(ctx)
 			streamCtx, streamSpan := beeline.StartSpan(ctx, "chat_stream")
-			temperature := float64(0.5)
-			one := int64(1)
+			temperature := float32(0.5)
+			zero := int32(0)
 			s := geminiClient.Models.GenerateContentStream(streamCtx, "models/gemini-2.0-flash", messages, &genai.GenerateContentConfig{
 				SystemInstruction: &genai.Content{Parts: []*genai.Part{{Text: systemPrompt}}},
 				Temperature:       &temperature,
-				CandidateCount:    &one,
+				CandidateCount:    1,
 				Tools:             tools,
+				ThinkingConfig: &genai.ThinkingConfig{
+					IncludeThoughts: false,
+					ThinkingBudget:  &zero,
+				},
 			})
 			var functionCall *genai.FunctionCall
 			content := ""
@@ -180,7 +187,7 @@ func (ps *PromptSession) Run(ctx context.Context) {
 				ourContent := ""
 				for _, c := range choice.Content.Parts {
 					if c.Text != "" {
-						ourContent += c.Text
+						ourContent += fixUnsupportedCharacters(c.Text)
 					}
 					if c.FunctionCall != nil {
 						fc := *c.FunctionCall
@@ -261,19 +268,19 @@ func (ps *PromptSession) Run(ctx context.Context) {
 			}
 			streamSpan.Send()
 			if usageData != nil {
-				if usageData.PromptTokenCount != nil {
-					_, err = qt.ChargeOutputQuota(ctx, int(*usageData.PromptTokenCount))
+				if usageData.PromptTokenCount != 0 {
+					_, err = qt.ChargeOutputQuota(ctx, int(usageData.PromptTokenCount))
 					if err != nil {
 						log.Printf("charge output quota failed: %v\n", err)
 					}
-					totalInputTokens += int(*usageData.PromptTokenCount)
+					totalInputTokens += int(usageData.PromptTokenCount)
 				}
-				if usageData.CandidatesTokenCount != nil {
-					_, err = qt.ChargeInputQuota(ctx, int(*usageData.CandidatesTokenCount))
+				if usageData.CandidatesTokenCount != 0 {
+					_, err = qt.ChargeInputQuota(ctx, int(usageData.CandidatesTokenCount))
 					if err != nil {
 						log.Printf("charge input quota failed: %v\n", err)
 					}
-					totalOutputTokens += int(*usageData.CandidatesTokenCount)
+					totalOutputTokens += int(usageData.CandidatesTokenCount)
 				}
 			}
 			if len(strings.TrimSpace(content)) > 0 {
@@ -380,6 +387,11 @@ func (ps *PromptSession) Run(ctx context.Context) {
 	_ = ps.conn.Close(websocket.StatusNormalClosure, "")
 }
 
+func fixUnsupportedCharacters(s string) string {
+	// Replace the narrow non-breaking space with a regular non-breaking space.
+	return strings.ReplaceAll(s, "\u202f", "\u00a0")
+}
+
 func (ps *PromptSession) storeThread(ctx context.Context, messages []*genai.Content) error {
 	ctx, span := beeline.StartSpan(ctx, "store_thread")
 	defer span.Send()
@@ -408,29 +420,28 @@ func (ps *PromptSession) storeThread(ctx context.Context, messages []*genai.Cont
 			}
 		}
 	}
-	j, err := json.Marshal(toStore)
-	if err != nil {
-		span.AddField("error", err)
-		return err
-	}
-	ps.redis.Set(ctx, "thread:"+ps.threadId.String(), j, 10*time.Minute)
-	return nil
+	threadContext := query.ThreadContextFromContext(ctx)
+	threadContext.Messages = toStore
+	return persistence.StoreThread(ctx, ps.redis, threadContext)
 }
 
-func (ps *PromptSession) restoreThread(ctx context.Context, oldThreadId string) ([]*genai.Content, error) {
-	ctx, span := beeline.StartSpan(ctx, "restore_thread")
-	defer span.Send()
-	messages, err := persistence.LoadThread(ctx, ps.redis, oldThreadId)
+func (ps *PromptSession) restoreContext(ctx context.Context, oldThreadId string) (context.Context, *persistence.ThreadContext, error) {
+	threadContext, err := persistence.LoadThread(ctx, ps.redis, oldThreadId)
 	if err != nil {
-		span.AddField("error", err)
-		return nil, err
+		return ctx, nil, err
 	}
+	ctx = query.ContextWithThread(ctx, threadContext)
+
+	return ctx, threadContext, nil
+}
+
+func (ps *PromptSession) restoreThread(threadContext *persistence.ThreadContext) []*genai.Content {
 	var result []*genai.Content
-	for _, m := range messages {
+	for _, m := range threadContext.Messages {
 		result = append(result, &genai.Content{
 			Parts: []*genai.Part{{Text: m.Content, FunctionCall: m.FunctionCall, FunctionResponse: m.FunctionResponse}},
 			Role:  m.Role,
 		})
 	}
-	return result, nil
+	return result
 }
